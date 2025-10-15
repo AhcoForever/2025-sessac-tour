@@ -31,6 +31,10 @@ dependencies:
   flutter:
     sdk: flutter
 
+  flex_color_scheme: 8.3.0
+  mask_text_input_formatter: ^2.9.0
+  go_router: ^16.2.4
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
