@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../models/user.dart';
+import '../services/auth_service.dart';
+import 'signup_page.dart';
+import 'forgot_password_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,6 +15,10 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  // AuthService 인스턴스
+  final _authService = AuthService();
+
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
@@ -22,24 +29,94 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  // 로그인 처리
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      // TODO: 실제 로그인 로직 구현
-      await Future.delayed(const Duration(seconds: 2));
-
-      setState(() => _isLoading = false);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('로그인 성공!'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-          ),
+      try {
+        // Firebase 로그인 호출
+        final user = await _authService.signIn(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
         );
+
+        setState(() => _isLoading = false);
+
+        if (mounted && user != null) {
+          // 성공 메시지
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('환영합니다, ${user.email}님!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // TODO: 홈 화면으로 이동
+          // Navigator.pushReplacement(
+          //   context,
+          //   MaterialPageRoute(builder: (context) => const HomePage()),
+          // );
+
+          // 임시: 성공 다이얼로그
+          _showSuccessDialog(user);
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+
+        if (mounted) {
+          // 에러 메시지 표시
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString()),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
+  }
+
+  // 로그인 성공 다이얼로그 (임시)
+  void _showSuccessDialog(UserModel user) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('로그인 성공!'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('UID: ${user.uid}'),
+            const SizedBox(height: 8),
+            Text('이메일: ${user.email}'),
+            const SizedBox(height: 8),
+            Text('핸드폰: ${user.phoneNumber ?? "미등록"}'),
+            const SizedBox(height: 8),
+            Text('가입일: ${user.createdAt.toString().split('.')[0]}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              // 로그아웃
+              await _authService.signOut();
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('로그아웃 되었습니다')),
+                );
+              }
+            },
+            child: const Text('로그아웃'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -145,9 +222,11 @@ class _LoginPageState extends State<LoginPage> {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () {
-                      // TODO: 비밀번호 찾기
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('비밀번호 찾기 기능 준비 중')),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ForgotPasswordPage(),
+                        ),
                       );
                     },
                     child: const Text('비밀번호를 잊으셨나요?'),
@@ -163,23 +242,23 @@ class _LoginPageState extends State<LoginPage> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: _isLoading
-                      ? SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Theme.of(context).colorScheme.onPrimary,
-                            ),
-                          ),
-                        )
+                      ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.white,
+                      ),
+                    ),
+                  )
                       : const Text(
-                          '로그인',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                    '로그인',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: 16),
@@ -201,7 +280,8 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
 
-                const SizedBox(height: 16),
+
+                const SizedBox(height: 32),
 
                 // 회원가입 링크
                 Row(
@@ -213,7 +293,12 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     TextButton(
                       onPressed: () {
-                        context.goNamed('signup');
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SignupPage(),
+                          ),
+                        );
                       },
                       child: const Text(
                         '회원가입',

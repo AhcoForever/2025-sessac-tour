@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import '../services/auth_service.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -15,10 +15,15 @@ class _SignupPageState extends State<SignupPage> {
   final _passwordController = TextEditingController();
   final _passwordConfirmController = TextEditingController();
   final _phoneController = TextEditingController();
-  final phoneMaskFormatter = MaskTextInputFormatter(
+
+  // 핸드폰 번호 포맷터
+  final _phoneMaskFormatter = MaskTextInputFormatter(
     mask: '###-####-####',
     filter: {"#": RegExp(r'[0-9]')},
   );
+
+  // AuthService 인스턴스
+  final _authService = AuthService();
 
   bool _isPasswordVisible = false;
   bool _isPasswordConfirmVisible = false;
@@ -72,20 +77,40 @@ class _SignupPageState extends State<SignupPage> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      // TODO: 실제 회원가입 로직
-      await Future.delayed(const Duration(seconds: 2));
-
-      setState(() => _isLoading = false);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('회원가입 성공!'),
-            backgroundColor: Colors.green,
-          ),
+      try {
+        // Firebase 회원가입 호출
+        final user = await _authService.signUp(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          phoneNumber: _phoneController.text.trim(),
         );
-        // 로그인 페이지로 이동
-        Navigator.pop(context);
+
+        setState(() => _isLoading = false);
+
+        if (mounted && user != null) {
+          // 성공 메시지
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('회원가입 성공! 로그인 해주세요.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // 로그인 페이지로 이동
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+
+        if (mounted) {
+          // 에러 메시지 표시
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString()),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -138,12 +163,6 @@ class _SignupPageState extends State<SignupPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            context.goNamed('login');
-          }
-        ),
         title: const Text('회원가입'),
       ),
       body: SafeArea(
@@ -252,11 +271,23 @@ class _SignupPageState extends State<SignupPage> {
                 TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
-                  inputFormatters: [phoneMaskFormatter],  // 추가
+                  inputFormatters: [_phoneMaskFormatter],
                   decoration: const InputDecoration(
                     labelText: '핸드폰 번호',
                     hintText: '010-1234-5678',
+                    prefixIcon: Icon(Icons.phone_outlined),
                   ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return '핸드폰 번호를 입력해주세요';
+                    }
+                    // 숫자만 추출
+                    final numbers = value.replaceAll(RegExp(r'[^0-9]'), '');
+                    if (numbers.length != 11) {
+                      return '올바른 핸드폰 번호가 아닙니다';
+                    }
+                    return null;
+                  },
                 ),
 
                 const SizedBox(height: 32),
@@ -295,18 +326,31 @@ class _SignupPageState extends State<SignupPage> {
                   contentPadding: EdgeInsets.zero,
                   title: Row(
                     children: [
-                      const Text('이용약관 동의 '),
-                      Text(
-                        '(필수)',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                      Flexible(
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              const TextSpan(text: '이용약관 동의 '),
+                              TextSpan(
+                                text: '(필수)',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
+                            ],
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Spacer(),
                       TextButton(
                         onPressed: () => _showTermsDetail(
                           '이용약관',
                           '여기에 실제 이용약관 내용이 들어갑니다.\n\n제1조 (목적)\n본 약관은...',
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 36),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         child: const Text('보기'),
                       ),
@@ -327,18 +371,31 @@ class _SignupPageState extends State<SignupPage> {
                   contentPadding: EdgeInsets.zero,
                   title: Row(
                     children: [
-                      const Text('개인정보 처리방침 동의 '),
-                      Text(
-                        '(필수)',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                      Flexible(
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              const TextSpan(text: '개인정보 처리방침 동의 '),
+                              TextSpan(
+                                text: '(필수)',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
+                            ],
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Spacer(),
                       TextButton(
                         onPressed: () => _showTermsDetail(
                           '개인정보 처리방침',
                           '여기에 실제 개인정보 처리방침 내용이 들어갑니다.\n\n1. 수집하는 개인정보...',
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 36),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         child: const Text('보기'),
                       ),
@@ -359,18 +416,31 @@ class _SignupPageState extends State<SignupPage> {
                   contentPadding: EdgeInsets.zero,
                   title: Row(
                     children: [
-                      const Text('마케팅 정보 수신 동의 '),
-                      Text(
-                        '(선택)',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      Flexible(
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              const TextSpan(text: '마케팅 정보 수신 동의 '),
+                              TextSpan(
+                                text: '(선택)',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Spacer(),
                       TextButton(
                         onPressed: () => _showTermsDetail(
                           '마케팅 정보 수신 동의',
                           '여기에 마케팅 정보 수신 동의 내용이 들어갑니다.\n\n이벤트, 프로모션...',
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 36),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         child: const Text('보기'),
                       ),
