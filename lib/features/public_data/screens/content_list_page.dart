@@ -59,7 +59,8 @@ class _ContentListPageState extends State<ContentListPage> {
     setState(() {
       _isLoading = false;
       if (response != null) {
-        _contents = response.data;
+        // 진행 중인 콘텐츠만 필터링
+        _contents = response.data.where((content) => content.isOngoing()).toList();
         _pagingInfo = response.paging;
       } else {
         _errorMessage = '데이터를 불러올 수 없습니다.';
@@ -89,7 +90,8 @@ class _ContentListPageState extends State<ContentListPage> {
     setState(() {
       _isLoadingMore = false;
       if (response != null) {
-        _contents.addAll(response.data);
+        // 진행 중인 콘텐츠만 필터링하여 추가
+        _contents.addAll(response.data.where((content) => content.isOngoing()).toList());
         _pagingInfo = response.paging;
       }
     });

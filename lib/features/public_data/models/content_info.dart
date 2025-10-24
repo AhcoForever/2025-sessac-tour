@@ -30,17 +30,41 @@ class ContentInfo {
   });
 
   factory ContentInfo.fromJson(Map<String, dynamic> json) {
+    // String 또는 List를 안전하게 파싱하는 헬퍼 함수
+    List<String> parseStringList(dynamic value) {
+      if (value == null) return [];
+      if (value is List) {
+        return value.map((e) => e.toString()).toList();
+      }
+      if (value is String) {
+        return value.isEmpty ? [] : [value];
+      }
+      return [];
+    }
+
+    // cate_depth는 '>' 기준으로 split
+    List<String> parseCateDepth(dynamic value) {
+      if (value == null) return [];
+      if (value is List) {
+        return value.map((e) => e.toString()).toList();
+      }
+      if (value is String) {
+        return value.isEmpty ? [] : value.split('>').map((e) => e.trim()).toList();
+      }
+      return [];
+    }
+
     return ContentInfo(
       cid: json['cid'] ?? '',
       langCodeId: json['lang_code_id'] ?? '',
-      cateDepth: List<String>.from(json['cate_depth'] ?? []),
+      cateDepth: parseCateDepth(json['cate_depth']),
       mainImg: json['main_img'] ?? '',
-      relateImg: List<String>.from(json['relate_img'] ?? []),
+      relateImg: parseStringList(json['relate_img']),
       postSj: json['post_sj'] ?? '',
       sumry: json['sumry'] ?? '',
       schdulInfoBgnde: json['schdul_info_bgnde'] ?? '',
       schdulInfoEndde: json['schdul_info_endde'] ?? '',
-      tag: List<String>.from(json['tag'] ?? []),
+      tag: parseStringList(json['tag']),
       extra: json['extra'] != null ? ExtraInfo.fromJson(json['extra']) : null,
       traffic: json['traffic'] != null ? TrafficInfo.fromJson(json['traffic']) : null,
       postDesc: json['post_desc'] ?? '',
@@ -66,14 +90,24 @@ class ExtraInfo {
   });
 
   factory ExtraInfo.fromJson(Map<String, dynamic> json) {
+    // String 또는 List를 안전하게 파싱
+    List<String>? parseStringList(dynamic value) {
+      if (value == null) return null;
+      if (value is List) {
+        return value.map((e) => e.toString()).toList();
+      }
+      if (value is String) {
+        return value.isEmpty ? null : [value];
+      }
+      return null;
+    }
+
     return ExtraInfo(
       cmmnTelno: json['cmmn_telno'],
       cmmnHmpgUrl: json['cmmn_hmpg_url'],
       cmmnUseTime: json['cmmn_use_time'],
       cmmnImportant: json['cmmn_important'],
-      disabledFacility: json['disabled_facility'] != null
-          ? List<String>.from(json['disabled_facility'])
-          : null,
+      disabledFacility: parseStringList(json['disabled_facility']),
       closedDays: json['closed_days'],
     );
   }
