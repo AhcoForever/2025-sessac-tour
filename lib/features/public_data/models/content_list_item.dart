@@ -9,6 +9,8 @@ class ContentListItem {
   final String sumry; // 요약
   final String creatDtText; // 생성일
   final String updtDtText; // 수정일
+  final String schdulInfoBgnde; // 시작일
+  final String schdulInfoEndde; // 종료일
 
   ContentListItem({
     required this.cid,
@@ -21,21 +23,95 @@ class ContentListItem {
     required this.sumry,
     required this.creatDtText,
     required this.updtDtText,
+    required this.schdulInfoBgnde,
+    required this.schdulInfoEndde,
   });
 
   factory ContentListItem.fromJson(Map<String, dynamic> json) {
+    // cate_depth 파싱: String 또는 List 모두 처리
+    List<String> parseCateDepth(dynamic value) {
+      if (value == null) return [];
+      if (value is List) {
+        return value.map((e) => e.toString()).toList();
+      }
+      if (value is String) {
+        // String인 경우 '>' 기준으로 split
+        return value.isEmpty ? [] : value.split('>').map((e) => e.trim()).toList();
+      }
+      return [];
+    }
+
     return ContentListItem(
       cid: json['cid'] ?? '',
       langCodeId: json['lang_code_id'] ?? '',
       comCtgrySn: json['com_ctgry_sn'] ?? '',
-      cateDepth: List<String>.from(json['cate_depth'] ?? []),
+      cateDepth: parseCateDepth(json['cate_depth']),
       multiLangList: json['multi_lang_list'] ?? '',
       mainImg: json['main_img'] ?? '',
       postSj: json['post_sj'] ?? '',
       sumry: json['sumry'] ?? '',
       creatDtText: json['creat_dt_text'] ?? '',
       updtDtText: json['updt_dt_text'] ?? '',
+      schdulInfoBgnde: json['schdul_info_bgnde'] ?? '',
+      schdulInfoEndde: json['schdul_info_endde'] ?? '',
     );
+  }
+
+  // 현재 진행 중인지 확인
+  bool isOngoing() {
+    if (schdulInfoBgnde.isEmpty || schdulInfoEndde.isEmpty) {
+      return true; // 일정 정보가 없으면 항상 표시
+    }
+
+    try {
+      final now = DateTime.now();
+      final startDate = _parseDate(schdulInfoBgnde);
+      final endDate = _parseDate(schdulInfoEndde);
+
+      if (startDate == null || endDate == null) {
+        return true; // 파싱 실패 시 항상 표시
+      }
+
+      // 현재 날짜가 시작일~종료일 사이인지 확인
+      return now.isAfter(startDate.subtract(const Duration(days: 1))) &&
+          now.isBefore(endDate.add(const Duration(days: 1)));
+    } catch (e) {
+      return true; // 오류 발생 시 항상 표시
+    }
+  }
+
+  // 날짜 파싱 헬퍼 함수 (여러 형식 지원)
+  DateTime? _parseDate(String dateString) {
+    if (dateString.isEmpty) return null;
+
+    try {
+      // "YYYY-MM-DD" 형식
+      if (dateString.contains('-')) {
+        return DateTime.parse(dateString);
+      }
+      // "YYYY.MM.DD" 형식
+      if (dateString.contains('.')) {
+        final parts = dateString.split('.');
+        if (parts.length == 3) {
+          return DateTime(
+            int.parse(parts[0]),
+            int.parse(parts[1]),
+            int.parse(parts[2]),
+          );
+        }
+      }
+      // "YYYYMMDD" 형식
+      if (dateString.length == 8) {
+        return DateTime(
+          int.parse(dateString.substring(0, 4)),
+          int.parse(dateString.substring(4, 6)),
+          int.parse(dateString.substring(6, 8)),
+        );
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
   }
 }
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/config.dart';
 import '../../public_data/models/cultural_event.dart';
+import '../../public_data/models/content_list_item.dart';
 import '../../public_data/services/seoulapi_service.dart';
+import '../../public_data/services/visitseoul_api_service.dart';
 import '../models/chat_message.dart';
 import '../services/claude_service.dart';
 
@@ -19,11 +21,14 @@ class _AiChatPageState extends State<AiChatPage> {
 
   late ClaudeService _claudeService;
   final SeoulApiService _seoulApiService = SeoulApiService();
+  final VisitSeoulApiService _visitSeoulApiService = VisitSeoulApiService();
 
   bool _isLoading = false;
   bool _isLoadingData = true; // 데이터 로딩 중
   List<CulturalEvent> _culturalEvents = [];
   String _eventsDataText = '';
+  List<ContentListItem> _tourContents = [];
+  String _tourContentsDataText = '';
 
   // 🎯 기본 시스템 프롬프트
   String get _systemPrompt => '''
@@ -50,6 +55,13 @@ $_eventsDataText
 
 위 정보를 참고하여 사용자에게 적합한 행사를 추천해주세요.
 행사 추천 시 반드시 위 정보에 있는 실제 데이터만 사용하세요.
+
+---
+[서울 관광 콘텐츠 정보]
+$_tourContentsDataText
+
+위 관광 콘텐츠 정보를 참고하여 사용자에게 적합한 관광지, 맛집, 체험을 추천해주세요.
+추천 시 반드시 위 정보에 있는 실제 데이터만 사용하세요.
   ''';
 
   @override
@@ -68,6 +80,8 @@ $_eventsDataText
 
     // 서울시 문화행사 데이터 로드
     _loadCulturalEvents();
+    // VisitSeoul 관광 콘텐츠 데이터 로드
+    _loadTourContents();
   }
 
   /// 서울시 문화행사 데이터 로드 (RAG)
@@ -107,6 +121,51 @@ $_eventsDataText
       setState(() {
         _eventsDataText = '현재 문화행사 정보를 불러올 수 없습니다.';
         _isLoadingData = false;
+      });
+    }
+  }
+
+  /// VisitSeoul 관광 콘텐츠 데이터 로드 (RAG)
+  Future<void> _loadTourContents() async {
+    try {
+      // VisitSeoul 관광 콘텐츠 20개 가져오기 (한국어)
+      final response = await _visitSeoulApiService.getContentList(
+        langCodeId: 'ko',
+        sortType: 'latest',
+        pageNo: 1,
+      );
+
+      if (response != null) {
+        // 진행 중인 콘텐츠만 필터링
+        final ongoingContents = response.data
+            .where((content) => content.isOngoing())
+            .take(20)
+            .toList();
+
+        // 데이터를 텍스트로 포맷팅
+        final buffer = StringBuffer();
+        for (int i = 0; i < ongoingContents.length; i++) {
+          final content = ongoingContents[i];
+          buffer.writeln('${i + 1}. ${content.postSj}');
+          buffer.writeln('   - 카테고리: ${content.cateDepth.join(' > ')}');
+          if (content.schdulInfoBgnde.isNotEmpty) {
+            buffer.writeln('   - 기간: ${content.schdulInfoBgnde} ~ ${content.schdulInfoEndde}');
+          }
+          buffer.writeln('   - 요약: ${content.sumry}');
+          buffer.writeln();
+        }
+
+        setState(() {
+          _tourContents = ongoingContents;
+          _tourContentsDataText = buffer.toString();
+        });
+
+        print('✅ 관광 콘텐츠 ${ongoingContents.length}개 로드 완료');
+      }
+    } catch (e) {
+      print('❌ 관광 콘텐츠 로드 실패: $e');
+      setState(() {
+        _tourContentsDataText = '현재 관광 콘텐츠 정보를 불러올 수 없습니다.';
       });
     }
   }
