@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:custom_info_window/custom_info_window.dart';
 import '../services/location_service.dart';
 import 'widgets/marker_info_window.dart';
 import 'widgets/location_fab.dart';
+import 'widgets/floating_marker.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -28,6 +30,9 @@ class _MapPageState extends State<MapPage> {
   BitmapDescriptor? _customMarkerIcon;
   double _currentZoom = 18.0;
   double _previousZoom = 18.0;
+  StreamSubscription<Position>? _positionStreamSubscription;
+  double _currentMarkerSize = 90.0;
+  Offset? _markerScreenPosition;
 
   final LatLng _center = const LatLng(37.5665, 126.9780);
 
@@ -43,14 +48,46 @@ class _MapPageState extends State<MapPage> {
     await _loadCustomMarker();
     // 2. 마커 로드 완료 후 현재 위치 가져오기
     await _getCurrentLocation();
+    // 3. 실시간 위치 추적 시작
+    _startLocationTracking();
+  }
+
+  /// 실시간 위치 추적 시작
+  void _startLocationTracking() {
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 5, // 5미터 이상 이동 시 업데이트
+    );
+
+    _positionStreamSubscription = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen((Position position) {
+      setState(() {
+        _currentPosition = position;
+      });
+      // 마커 위치 업데이트
+      _addUserLocationMarker(position);
+
+      // 마커 화면 좌표 업데이트
+      _updateMarkerScreenPosition();
+
+      // 지도를 새 위치로 부드럽게 이동
+      if (mapController != null) {
+        mapController!.animateCamera(
+          CameraUpdate.newLatLng(
+            LatLng(position.latitude, position.longitude),
+          ),
+        );
+      }
+    });
   }
 
   /// 줌 레벨에 따른 마커 크기 계산
   int _calculateMarkerSize(double zoom) {
     // 줌 레벨에 따라 마커 크기를 동적으로 계산
-    // 줌 10: 40px, 줌 15: 80px, 줌 18: 120px, 줌 20: 160px
-    const minSize = 40;
-    const maxSize = 200;
+    // 줌 10: 30px, 줌 15: 60px, 줌 18: 90px, 줌 20: 120px
+    const minSize = 30;
+    const maxSize = 150;
     const minZoom = 10.0;
     const maxZoom = 21.0;
 
@@ -65,12 +102,16 @@ class _MapPageState extends State<MapPage> {
     final zoom = zoomLevel ?? _currentZoom;
     final markerSize = _calculateMarkerSize(zoom);
 
+    setState(() {
+      _currentMarkerSize = markerSize.toDouble();
+    });
+
     final ByteData data = await rootBundle.load(
       'assets/images/seoul_characters/dangdang-smile.png',
     );
     final ui.Codec codec = await ui.instantiateImageCodec(
       data.buffer.asUint8List(),
-      targetWidth: markerSize,
+      targetWidth: 1, // 매우 작게 (거의 안 보임)
     );
     final ui.FrameInfo fi = await codec.getNextFrame();
     final ByteData? byteData = await fi.image.toByteData(
@@ -89,11 +130,37 @@ class _MapPageState extends State<MapPage> {
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
     _customInfoWindowController.googleMapController = controller;
+    _updateMarkerScreenPosition();
+  }
+
+  /// 마커의 화면 좌표 업데이트
+  Future<void> _updateMarkerScreenPosition() async {
+    if (mapController == null || _currentPosition == null) return;
+
+    final latLng = LatLng(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+    );
+
+    try {
+      final screenCoordinate = await mapController!.getScreenCoordinate(latLng);
+      setState(() {
+        _markerScreenPosition = Offset(
+          screenCoordinate.x.toDouble(),
+          screenCoordinate.y.toDouble(),
+        );
+      });
+    } catch (e) {
+      // 에러 무시 (맵이 아직 준비되지 않은 경우)
+    }
   }
 
   /// 카메라 이동 시 줌 레벨 변화 감지
   void _onCameraMove(CameraPosition position) {
     _currentZoom = position.zoom;
+
+    // 마커 화면 좌표 업데이트
+    _updateMarkerScreenPosition();
 
     // 줌 레벨이 1.0 이상 변경되었을 때만 마커 크기 업데이트
     if ((_currentZoom - _previousZoom).abs() >= 1.0) {
@@ -122,6 +189,8 @@ class _MapPageState extends State<MapPage> {
     } else {
       // 현재 위치에 마커 추가
       _addUserLocationMarker(position);
+      // 마커 화면 좌표 업데이트
+      _updateMarkerScreenPosition();
     }
 
     setState(() {
@@ -215,11 +284,33 @@ class _MapPageState extends State<MapPage> {
               _onCameraMove(position);
             },
           ),
+          // 애니메이션 마커 (GPS 위치에 고정)
+          if (_currentPosition != null && _markerScreenPosition != null)
+            Positioned(
+              left: _markerScreenPosition!.dx - (_currentMarkerSize / 2),
+              top: _markerScreenPosition!.dy - (_currentMarkerSize / 2),
+              child: FloatingMarker(
+                imagePath: 'assets/images/seoul_characters/dangdang-smile.png',
+                size: _currentMarkerSize,
+                onTap: () {
+                  if (_currentPosition != null) {
+                    final markerPosition = LatLng(
+                      _currentPosition!.latitude,
+                      _currentPosition!.longitude,
+                    );
+                    _customInfoWindowController.addInfoWindow!(
+                      const MarkerInfoWindow(message: '댕댕청룡이 응원해요! 화이팅!'),
+                      markerPosition,
+                    );
+                  }
+                },
+              ),
+            ),
           CustomInfoWindow(
             controller: _customInfoWindowController,
             height: 60,
             width: 280,
-            offset: 150,
+            offset: 50,
           ),
         ],
       ),
@@ -232,6 +323,7 @@ class _MapPageState extends State<MapPage> {
 
   @override
   void dispose() {
+    _positionStreamSubscription?.cancel();
     _customInfoWindowController.dispose();
     mapController?.dispose();
     super.dispose();
