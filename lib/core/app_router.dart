@@ -6,6 +6,7 @@ import 'package:sessactour/features/ai/screens/onboarding_page2.dart';
 import 'package:sessactour/features/auth/screens/forgot_password_page.dart';
 import 'package:sessactour/features/auth/screens/login_page.dart';
 import 'package:sessactour/features/auth/screens/signup_page.dart';
+import 'package:sessactour/features/map/screens/map_page.dart';
 import 'package:sessactour/features/public_data/screens/content_detail_page.dart';
 import 'package:sessactour/features/public_data/screens/content_list_page.dart';
 import 'package:sessactour/features/public_data/screens/cultural_events_page.dart';
@@ -25,9 +26,9 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/',
       name: 'landing',
-      builder: (context, state) =>
+      builder: (context, state) => MapPage()
           //ContentListPage()
-          AiChatPage()
+          //AiChatPage()
           //CulturalEventsPage()
           //LandingPage(),
     ),
@@ -65,6 +66,11 @@ final GoRouter appRouter = GoRouter(
       path: '/ai-chat',
       name: 'ai-chat',
       builder: (context, state) => AiChatPage(),
+    ),
+    GoRoute(
+      path: '/map',
+      name: 'map',
+      builder: (context, state) => MapPage(),
     ),
     // GoRoute(
     //   path: '/map',
