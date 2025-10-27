@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class PhotoCapturePage extends StatelessWidget {
-  const PhotoCapturePage({super.key});
+class ProfilePage extends StatelessWidget {
+  const ProfilePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -10,4 +10,3 @@ class PhotoCapturePage extends StatelessWidget {
     );
   }
 }
-

@@ -3,13 +3,17 @@ import 'package:sessactour/core/landing_page.dart';
 import 'package:sessactour/features/ai/screens/ai_chat_page.dart';
 import 'package:sessactour/features/ai/screens/onboarding_page1.dart';
 import 'package:sessactour/features/ai/screens/onboarding_page2.dart';
+import 'package:sessactour/features/auth/screens/account_deletion_page.dart';
 import 'package:sessactour/features/auth/screens/forgot_password_page.dart';
 import 'package:sessactour/features/auth/screens/login_page.dart';
+import 'package:sessactour/features/auth/screens/logout_page.dart';
 import 'package:sessactour/features/auth/screens/signup_page.dart';
+import 'package:sessactour/features/camera/screens/photo_capture_page.dart';
 import 'package:sessactour/features/map/screens/map_page.dart';
 import 'package:sessactour/features/public_data/screens/content_detail_page.dart';
 import 'package:sessactour/features/public_data/screens/content_list_page.dart';
 import 'package:sessactour/features/public_data/screens/cultural_events_page.dart';
+import 'package:sessactour/features/setting/screens/profile_page.dart';
 
 import '../features/auth/services/auth_service.dart';
 import '../features/error/screens/error_screen.dart';
@@ -26,7 +30,8 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/',
       name: 'landing',
-      builder: (context, state) => MapPage()
+      builder: (context, state) => AccountDeletionPage()
+      //MapPage()
           //ContentListPage()
           //AiChatPage()
           //CulturalEventsPage()
@@ -72,6 +77,28 @@ final GoRouter appRouter = GoRouter(
       name: 'map',
       builder: (context, state) => MapPage(),
     ),
+
+    GoRoute(
+      path: '/profile',
+      name: 'profile',
+      builder: (context, state) => ProfilePage(),
+    ),
+    GoRoute(
+      path: '/logout',
+      name: 'logout',
+      builder: (context, state) => ProfilePage(),
+    ),
+    GoRoute(
+      path: '/photo-capture',
+      name: 'photo-capture',
+      builder: (context, state) => PhotoCapturePage(),
+    ),
+    GoRoute(
+      path: '/account-deletion',
+      name: 'account-deletion',
+      builder: (context, state) => AccountDeletionPage(),
+    ),
+
     // GoRoute(
     //   path: '/map',
     //   name: 'map',
