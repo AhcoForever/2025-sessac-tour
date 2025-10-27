@@ -56,6 +56,19 @@ dependencies:
   flutter_dotenv: ^6.0.0
   flutter_html: ^3.0.0
 
+  # 카메라
+  camera: ^0.11.2+1
+  image_picker: 1.2.0
+
+  # 이미지 처리
+  image: ^4.5.4
+  path_provider: ^2.1.5
+
+  # 권한 처리
+  permission_handler: ^12.0.1
+
+  # 도보 경로
+  flutter_polyline_points: ^3.1.0
 
 dev_dependencies:
   flutter_test:

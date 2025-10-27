@@ -115,6 +115,45 @@ class AuthService {
     await _auth.signOut();
   }
 
+  // 계정 삭제
+  Future<void> deleteAccount() async {
+    try {
+      final firebaseUser = _auth.currentUser;
+      if (firebaseUser == null) {
+        throw '로그인된 사용자가 없습니다.';
+      }
+
+      final uid = firebaseUser.uid;
+
+      // 1. Firestore에서 사용자 데이터 삭제
+      await _firestore.collection('users').doc(uid).delete();
+
+      // 2. Firebase Auth 계정 삭제
+      await firebaseUser.delete();
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  // 비밀번호 재확인 (계정 삭제 전 필요할 수 있음)
+  Future<void> reauthenticate(String password) async {
+    try {
+      final firebaseUser = _auth.currentUser;
+      if (firebaseUser == null || firebaseUser.email == null) {
+        throw '로그인된 사용자가 없습니다.';
+      }
+
+      final credential = firebase_auth.EmailAuthProvider.credential(
+        email: firebaseUser.email!,
+        password: password,
+      );
+
+      await firebaseUser.reauthenticateWithCredential(credential);
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
   // 비밀번호 재설정 이메일 발송
   Future<void> sendPasswordResetEmail(String email) async {
     try {
