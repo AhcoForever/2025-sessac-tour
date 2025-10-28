@@ -2,7 +2,7 @@ import 'package:go_router/go_router.dart';
 import 'package:sessactour/core/landing_page.dart';
 import 'package:sessactour/features/ai/screens/ai_chat_page.dart';
 import 'package:sessactour/features/ai/screens/character_select_page.dart';
-import 'package:sessactour/features/ai/screens/onboarding_page2.dart';
+import 'package:sessactour/features/ai/screens/routine_recommendation_page.dart';
 import 'package:sessactour/features/auth/screens/account_deletion_page.dart';
 import 'package:sessactour/features/auth/screens/forgot_password_page.dart';
 import 'package:sessactour/features/auth/screens/login_page.dart';
@@ -30,13 +30,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/',
       name: 'landing',
-      builder: (context, state) =>
-          //CharacterSelectPage()
-      //MapPage()
-          //ContentListPage()
-          //AiChatPage()
-          //CulturalEventsPage()
-          LandingPage(),
+      builder: (context, state) => MapPage(),
+      //ContentListPage()
+      //CulturalEventsPage()
+      //LandingPage(),
     ),
     GoRoute(
       path: '/login',
@@ -64,20 +61,11 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => CharacterSelectPage(),
     ),
     GoRoute(
-      path: '/onboarding2',
-      name: 'onboarding2',
-      builder: (context, state) => OnboardingPage2(),
-    ),
-    GoRoute(
       path: '/ai-chat',
       name: 'ai-chat',
       builder: (context, state) => AiChatPage(),
     ),
-    GoRoute(
-      path: '/map',
-      name: 'map',
-      builder: (context, state) => MapPage(),
-    ),
+    GoRoute(path: '/map', name: 'map', builder: (context, state) => MapPage()),
 
     GoRoute(
       path: '/profile',
@@ -98,6 +86,11 @@ final GoRouter appRouter = GoRouter(
       path: '/account-deletion',
       name: 'account-deletion',
       builder: (context, state) => AccountDeletionPage(),
+    ),
+    GoRoute(
+      path: '/routine-recommendation',
+      name: 'routine-recommendation',
+      builder: (context, state) => RoutineRecommendationPage(),
     ),
 
     // GoRoute(

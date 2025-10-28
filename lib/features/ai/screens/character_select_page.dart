@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:sessactour/features/ai/screens/widgets/page_indicator.dart';
 import '../data/chracter_data.dart';
 import '../models/chracter.dart';
+import '../services/character_storage_service.dart';
 
 class CharacterSelectPage extends StatefulWidget {
   const CharacterSelectPage({super.key});
@@ -20,10 +22,16 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
     super.dispose();
   }
 
-  void _confirmSelection() {
+  Future<void> _confirmSelection() async {
     final selectedCharacter = CharacterData.characters[_currentIndex];
-    // TODO: 선택한 캐릭터를 저장하고 다음 화면으로 이동
-    Navigator.pop(context, selectedCharacter);
+
+    // 선택한 캐릭터 저장
+    await CharacterStorageService.saveCharacter(selectedCharacter);
+
+    // 메인 화면으로 이동 (또는 AI 채팅 페이지로)
+    if (mounted) {
+      context.go('/ai-chat');
+    }
   }
 
   @override
@@ -49,7 +57,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '각 가이드는 고유한 성격과 말투를 가지고 있어요. \n 좌우로 스와프하여 캐릭터를 둘러보세요',
+                    '각 가이드는 고유한 성격과 말투를 가지고 있어요 \n 좌우로 스와프하여 캐릭터를 둘러보세요',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
