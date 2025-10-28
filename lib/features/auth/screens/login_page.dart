@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/user.dart';
+import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
-import 'signup_page.dart';
-import 'forgot_password_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -44,22 +42,8 @@ class _LoginPageState extends State<LoginPage> {
         setState(() => _isLoading = false);
 
         if (mounted && user != null) {
-          // 성공 메시지
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('환영합니다, ${user.email}님!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-
-          // TODO: 홈 화면으로 이동
-          // Navigator.pushReplacement(
-          //   context,
-          //   MaterialPageRoute(builder: (context) => const HomePage()),
-          // );
-
-          // 임시: 성공 다이얼로그
-          _showSuccessDialog(user);
+          // 캐릭터 선택 페이지로 이동
+          context.goNamed('character-select');
         }
       } catch (e) {
         setState(() => _isLoading = false);
@@ -75,48 +59,6 @@ class _LoginPageState extends State<LoginPage> {
         }
       }
     }
-  }
-
-  // 로그인 성공 다이얼로그 (임시)
-  void _showSuccessDialog(UserModel user) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('로그인 성공!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('UID: ${user.uid}'),
-            const SizedBox(height: 8),
-            Text('이메일: ${user.email}'),
-            const SizedBox(height: 8),
-            Text('핸드폰: ${user.phoneNumber ?? "미등록"}'),
-            const SizedBox(height: 8),
-            Text('가입일: ${user.createdAt.toString().split('.')[0]}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              // 로그아웃
-              await _authService.signOut();
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('로그아웃 되었습니다')),
-                );
-              }
-            },
-            child: const Text('로그아웃'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('확인'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -222,12 +164,7 @@ class _LoginPageState extends State<LoginPage> {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ForgotPasswordPage(),
-                        ),
-                      );
+                      context.push('/forgotpassword');
                     },
                     child: const Text('비밀번호를 잊으셨나요?'),
                   ),
@@ -293,12 +230,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     TextButton(
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SignupPage(),
-                          ),
-                        );
+                        context.push('/signup');
                       },
                       child: const Text(
                         '회원가입',
