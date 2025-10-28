@@ -4,7 +4,7 @@ import '../models/content_list_item.dart';
 import 'content_detail_page.dart';
 
 class ContentListPage extends StatefulWidget {
-  const ContentListPage({Key? key}) : super(key: key);
+  const ContentListPage({super.key});
 
   @override
   State<ContentListPage> createState() => _ContentListPageState();
@@ -21,18 +21,22 @@ class _ContentListPageState extends State<ContentListPage> {
   // 검색 필터
   String _selectedLang = 'ko';
   String _selectedSort = 'latest';
-  final TextEditingController _searchController = TextEditingController();
+  String? _selectedCategory;
+
+  // 카테고리 목록
+  final List<Map<String, dynamic>> _categories = [
+    {'name': '전체', 'icon': Icons.grid_view, 'value': null},
+    {'name': '축제', 'icon': Icons.celebration, 'value': '축제'},
+    {'name': '맛집', 'icon': Icons.restaurant, 'value': '맛집'},
+    {'name': '명소', 'icon': Icons.attractions, 'value': '명소'},
+    {'name': '쇼핑', 'icon': Icons.shopping_bag, 'value': '쇼핑'},
+    {'name': '숙박', 'icon': Icons.hotel, 'value': '숙박'},
+  ];
 
   @override
   void initState() {
     super.initState();
     _loadContents();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   // 콘텐츠 로드 (첫 페이지)
@@ -51,7 +55,7 @@ class _ContentListPageState extends State<ContentListPage> {
 
     final response = await _apiService.getContentList(
       langCodeId: _selectedLang,
-      keyword: _searchController.text.isEmpty ? null : _searchController.text,
+      keyword: _selectedCategory,
       sortType: _selectedSort,
       pageNo: 1,
     );
@@ -82,7 +86,7 @@ class _ContentListPageState extends State<ContentListPage> {
 
     final response = await _apiService.getContentList(
       langCodeId: _selectedLang,
-      keyword: _searchController.text.isEmpty ? null : _searchController.text,
+      keyword: _selectedCategory,
       sortType: _selectedSort,
       pageNo: nextPage,
     );
@@ -97,326 +101,508 @@ class _ContentListPageState extends State<ContentListPage> {
     });
   }
 
-  // 검색 실행
-  void _performSearch() {
-    _loadContents(refresh: true);
+  // 필터 바텀시트 표시
+  void _showFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        '필터',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // 언어 선택
+                  const Text('언어', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('한국어'),
+                        selected: _selectedLang == 'ko',
+                        onSelected: (selected) {
+                          setModalState(() => _selectedLang = 'ko');
+                          setState(() => _selectedLang = 'ko');
+                        },
+                      ),
+                      ChoiceChip(
+                        label: const Text('English'),
+                        selected: _selectedLang == 'en',
+                        onSelected: (selected) {
+                          setModalState(() => _selectedLang = 'en');
+                          setState(() => _selectedLang = 'en');
+                        },
+                      ),
+                      ChoiceChip(
+                        label: const Text('日本語'),
+                        selected: _selectedLang == 'ja',
+                        onSelected: (selected) {
+                          setModalState(() => _selectedLang = 'ja');
+                          setState(() => _selectedLang = 'ja');
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // 정렬 선택
+                  const Text('정렬', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('최신순'),
+                        selected: _selectedSort == 'latest',
+                        onSelected: (selected) {
+                          setModalState(() => _selectedSort = 'latest');
+                          setState(() => _selectedSort = 'latest');
+                        },
+                      ),
+                      ChoiceChip(
+                        label: const Text('가나다순'),
+                        selected: _selectedSort == 'abc',
+                        onSelected: (selected) {
+                          setModalState(() => _selectedSort = 'abc');
+                          setState(() => _selectedSort = 'abc');
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // 적용 버튼
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _loadContents(refresh: true);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('적용하기'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('서울 관광 정보'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          '서울 여행',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.tune, color: Colors.white),
+            onPressed: _showFilterBottomSheet,
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: () => _loadContents(refresh: true),
-            tooltip: '새로고침',
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // 검색 및 필터 영역
-          Container(
-            padding: const EdgeInsets.all(12),
-            color: Colors.grey[100],
-            child: Column(
-              children: [
-                // 검색창
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: '검색어를 입력하세요',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        _performSearch();
-                      },
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                  onSubmitted: (_) => _performSearch(),
-                ),
-                const SizedBox(height: 8),
-
-                // 필터 버튼들
-                Row(
-                  children: [
-                    // 언어 선택
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedLang,
-                        decoration: InputDecoration(
-                          labelText: '언어',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'ko', child: Text('한국어')),
-                          DropdownMenuItem(value: 'en', child: Text('English')),
-                          DropdownMenuItem(value: 'ja', child: Text('日本語')),
-                          DropdownMenuItem(value: 'zh-CN', child: Text('简体中文')),
-                          DropdownMenuItem(value: 'zh-TW', child: Text('繁體中文')),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectedLang = value;
-                            });
-                            _performSearch();
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-
-                    // 정렬 선택
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedSort,
-                        decoration: InputDecoration(
-                          labelText: '정렬',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'latest', child: Text('최신순')),
-                          DropdownMenuItem(value: 'abc', child: Text('가나다순')),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectedSort = value;
-                            });
-                            _performSearch();
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-
-                    // 검색 버튼
-                    ElevatedButton(
-                      onPressed: _performSearch,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                      child: const Icon(Icons.search),
-                    ),
+      body: CustomScrollView(
+        slivers: [
+          // 히어로 배너
+          SliverToBoxAdapter(
+            child: Container(
+              height: 260,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.blue[700]!,
+                    Colors.blue[500]!,
+                    Colors.cyan[400]!,
                   ],
                 ),
-              ],
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      const Text(
+                        '서울을 탐험하세요',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${_pagingInfo?.totalCount ?? 0}개의 멋진 장소가 기다려요',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
 
-          // 결과 개수 표시
-          if (_pagingInfo != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Text(
-                    '전체 ${_pagingInfo!.totalCount}개',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${_pagingInfo!.pageNo} / ${_pagingInfo!.totalPages} 페이지',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
+          // 카테고리 칩
+          SliverToBoxAdapter(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              height: 80,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _categories.length,
+                itemBuilder: (context, index) {
+                  final category = _categories[index];
+                  final isSelected = _selectedCategory == category['value'];
 
-          // 콘텐츠 리스트
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _errorMessage != null
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(_errorMessage!),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => _loadContents(refresh: true),
-                    child: const Text('다시 시도'),
-                  ),
-                ],
-              ),
-            )
-                : _contents.isEmpty
-                ? const Center(
-              child: Text('검색 결과가 없습니다'),
-            )
-                : ListView.builder(
-              itemCount: _contents.length + 1,
-              itemBuilder: (context, index) {
-                // 마지막 아이템: 더보기 버튼
-                if (index == _contents.length) {
-                  if (_pagingInfo?.hasNextPage ?? false) {
-                    return Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Center(
-                        child: _isLoadingMore
-                            ? const CircularProgressIndicator()
-                            : ElevatedButton(
-                          onPressed: _loadMoreContents,
-                          child: const Text('더보기'),
-                        ),
-                      ),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                }
-
-                // 일반 아이템
-                final content = _contents[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ContentDetailPage(
-                            cid: content.cid,
-                          ),
-                        ),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: FilterChip(
+                      selected: isSelected,
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          // 썸네일 이미지
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: content.mainImg.isNotEmpty
-                                ? Image.network(
-                              content.mainImg,
-                              width: 100,
-                              height: 100,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  width: 100,
-                                  height: 100,
-                                  color: Colors.grey[300],
-                                  child: const Icon(
-                                    Icons.image,
-                                    size: 50,
-                                  ),
-                                );
-                              },
-                            )
-                                : Container(
-                              width: 100,
-                              height: 100,
-                              color: Colors.grey[300],
-                              child: const Icon(
-                                Icons.image,
-                                size: 50,
-                              ),
+                          Icon(
+                            category['icon'] as IconData,
+                            size: 18,
+                            color: isSelected ? Colors.white : Colors.blue[700],
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            category['name'],
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.blue[700],
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                        ],
+                      ),
+                      selectedColor: Colors.blue[700],
+                      backgroundColor: Colors.blue[50],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(
+                          color: isSelected ? Colors.blue[700]! : Colors.transparent,
+                        ),
+                      ),
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedCategory = category['value'];
+                        });
+                        _loadContents(refresh: true);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
 
-                          // 콘텐츠 정보
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // 카테고리
-                                if (content.cateDepth.isNotEmpty)
-                                  Text(
-                                    content.cateDepth.join(' > '),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.blue[700],
+          // 콘텐츠 리스트
+          if (_isLoading)
+            const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_errorMessage != null)
+            SliverFillRemaining(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text(_errorMessage!),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => _loadContents(refresh: true),
+                      child: const Text('다시 시도'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (_contents.isEmpty)
+            SliverFillRemaining(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    const Text('검색 결과가 없습니다'),
+                  ],
+                ),
+              ),
+            )
+          else
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  // 마지막 아이템: 더보기 버튼
+                  if (index == _contents.length) {
+                    if (_pagingInfo?.hasNextPage ?? false) {
+                      return Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Center(
+                          child: _isLoadingMore
+                              ? const CircularProgressIndicator()
+                              : OutlinedButton(
+                                  onPressed: _loadMoreContents,
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 32,
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                const SizedBox(height: 4),
-
-                                // 제목
-                                Text(
-                                  content.postSj,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                                  child: const Text('더 보기'),
                                 ),
-                                const SizedBox(height: 4),
+                        ),
+                      );
+                    }
+                    return const SizedBox(height: 20);
+                  }
 
-                                // 요약
-                                Text(
-                                  content.sumry.trim(),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey[600],
+                  // 큰 카드 아이템
+                  final content = _contents[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ContentDetailPage(
+                                cid: content.cid,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 큰 이미지 with 그라데이션
+                            Stack(
+                              children: [
+                                content.mainImg.isNotEmpty
+                                    ? Image.network(
+                                        content.mainImg,
+                                        width: double.infinity,
+                                        height: 240,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Container(
+                                            width: double.infinity,
+                                            height: 240,
+                                            color: Colors.grey[300],
+                                            child: Icon(
+                                              Icons.image,
+                                              size: 80,
+                                              color: Colors.grey[400],
+                                            ),
+                                          );
+                                        },
+                                      )
+                                    : Container(
+                                        width: double.infinity,
+                                        height: 240,
+                                        color: Colors.grey[300],
+                                        child: Icon(
+                                          Icons.image,
+                                          size: 80,
+                                          color: Colors.grey[400],
+                                        ),
+                                      ),
+
+                                // 그라데이션 오버레이
+                                Positioned.fill(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Colors.transparent,
+                                          Colors.black.withValues(alpha: 0.7),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 4),
 
-                                // 수정일
-                                Text(
-                                  '수정일: ${content.updtDtText}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey[500],
+                                // 카테고리 태그
+                                if (content.cateDepth.isNotEmpty)
+                                  Positioned(
+                                    top: 12,
+                                    left: 12,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.9),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        content.cateDepth.first,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue[700],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                // 이미지 위 제목
+                                Positioned(
+                                  bottom: 16,
+                                  left: 16,
+                                  right: 16,
+                                  child: Text(
+                                    content.postSj,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black26,
+                                          offset: Offset(0, 2),
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
 
-                          // 화살표 아이콘
-                          const Icon(
-                            Icons.arrow_forward_ios,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                        ],
+                            // 콘텐츠 정보
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // 요약
+                                  Text(
+                                    content.sumry.trim(),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[700],
+                                      height: 1.5,
+                                    ),
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  // 수정일과 화살표
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.schedule,
+                                            size: 14,
+                                            color: Colors.grey[500],
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            content.updtDtText,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[500],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Icon(
+                                        Icons.arrow_forward,
+                                        color: Colors.blue[700],
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+                childCount: _contents.length + 1,
+              ),
             ),
-          ),
         ],
       ),
     );
