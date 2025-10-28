@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/config.dart';
 import '../../public_data/models/cultural_event.dart';
 import '../../public_data/models/content_list_item.dart';
 import '../../public_data/services/seoulapi_service.dart';
 import '../../public_data/services/visitseoul_api_service.dart';
 import '../models/chat_message.dart';
+import '../models/chracter.dart';
 import '../services/claude_service.dart';
+import '../services/character_storage_service.dart';
 
 class AiChatPage extends StatefulWidget {
   const AiChatPage({super.key});
@@ -29,9 +32,18 @@ class _AiChatPageState extends State<AiChatPage> {
   String _eventsDataText = '';
   List<ContentListItem> _tourContents = [];
   String _tourContentsDataText = '';
+  Character? _selectedCharacter; // 선택된 캐릭터
 
-  // 🎯 기본 시스템 프롬프트
-  String get _systemPrompt => '''
+  // 🎯 시스템 프롬프트 (선택된 캐릭터 기반)
+  String get _systemPrompt {
+    String characterPrompt = '';
+
+    if (_selectedCharacter != null) {
+      // 선택된 캐릭터의 프롬프트 사용
+      characterPrompt = _selectedCharacter!.getSystemPrompt();
+    } else {
+      // 기본 프롬프트 (폴백)
+      characterPrompt = '''
 당신은 "소울해치"라는 이름의 친근한 서울 여행 가이드입니다.
 
 역할:
@@ -43,6 +55,11 @@ class _AiChatPageState extends State<AiChatPage> {
 - "~야", "~해" 등 반말을 사용합니다
 - 공감하고 격려하는 톤으로 대화합니다
 - 예: "오늘 기분이 어때?", "그렇구나! 그럼 이런 곳 어때?"
+''';
+    }
+
+    return '''
+$characterPrompt
 
 추천 시 포함할 정보:
 - 장소 이름과 위치
@@ -62,7 +79,8 @@ $_tourContentsDataText
 
 위 관광 콘텐츠 정보를 참고하여 사용자에게 적합한 관광지, 맛집, 체험을 추천해주세요.
 추천 시 반드시 위 정보에 있는 실제 데이터만 사용하세요.
-  ''';
+''';
+  }
 
   @override
   void initState() {
@@ -73,15 +91,46 @@ $_tourContentsDataText
       model: AppConfig.claudeModel,
     );
 
-    // 초기 환영 메시지
-    _messages.add(ChatMessage.assistant(
-      '"안녕💫 나는 소울해치야!오늘 너의 기분을 센싱해서 서울의 하루를 예쁘게 디자인해줄게🌷지금 기분은 어때?"',
-    ));
+    // 저장된 캐릭터 불러오기
+    _loadCharacter();
 
     // 서울시 문화행사 데이터 로드
     _loadCulturalEvents();
     // VisitSeoul 관광 콘텐츠 데이터 로드
     _loadTourContents();
+  }
+
+  /// 저장된 캐릭터 불러오기
+  Future<void> _loadCharacter() async {
+    final character = await CharacterStorageService.loadCharacter();
+    setState(() {
+      _selectedCharacter = character;
+    });
+
+    // 초기 환영 메시지 (캐릭터별로)
+    String welcomeMessage;
+    if (_selectedCharacter != null) {
+      welcomeMessage = _getWelcomeMessage(_selectedCharacter!);
+    } else {
+      welcomeMessage =
+          '"안녕💫 나는 소울해치야! 오늘 너의 기분을 센싱해서 서울의 하루를 예쁘게 디자인해줄게🌷 지금 기분은 어때?"';
+    }
+
+    _messages.add(ChatMessage.assistant(welcomeMessage));
+  }
+
+  /// 캐릭터별 환영 메시지 생성
+  String _getWelcomeMessage(Character character) {
+    switch (character.id) {
+      case 'haetchi':
+        return '안녕💫 나는 ${character.name}야! 오늘 너의 기분을 센싱해서 서울의 하루를 예쁘게 디자인해줄게🌷 지금 기분은 어때?';
+      case 'cheongryong':
+        return '멍멍! 나는 ${character.name}! 오늘 어디 갈까? 재미있는 곳 찾아줄게!';
+      case 'baekho':
+        return '어이! 나는 ${character.name}야. 서울 구석구석 다 아는 나랑 같이 돌아다녀보자고!';
+      default:
+        return '안녕! 나는 ${character.name}! 서울 여행을 도와줄게!';
+    }
   }
 
   /// 서울시 문화행사 데이터 로드 (RAG)
@@ -291,7 +340,18 @@ $_tourContentsDataText
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Claude AI 채팅'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // 캐릭터 선택 페이지로 이동
+            context.go('/character-select');
+          },
+        ),
+        title: Text(
+          _selectedCharacter != null
+              ? '${_selectedCharacter!.name}와 채팅'
+              : 'AI 채팅',
+        ),
       ),
       body: Column(
         children: [
@@ -303,7 +363,10 @@ $_tourContentsDataText
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
-                return _MessageBubble(message: message);
+                return _MessageBubble(
+                  message: message,
+                  character: _selectedCharacter,
+                );
               },
             ),
           ),
@@ -395,8 +458,12 @@ $_tourContentsDataText
 /// 메시지 버블 위젯
 class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
+  final Character? character;
 
-  const _MessageBubble({required this.message});
+  const _MessageBubble({
+    required this.message,
+    this.character,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -411,7 +478,22 @@ class _MessageBubble extends StatelessWidget {
         children: [
           if (!isUser) ...[
             CircleAvatar(
-              child: const Icon(Icons.smart_toy, color: Colors.white),
+              backgroundColor:
+                  character?.themeColor ?? Theme.of(context).colorScheme.primary,
+              child: character != null
+                  ? ClipOval(
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Image.asset(
+                          character!.imagePath,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(Icons.smart_toy, color: Colors.white);
+                          },
+                        ),
+                      ),
+                    )
+                  : const Icon(Icons.smart_toy, color: Colors.white),
             ),
             const SizedBox(width: 8),
           ],
