@@ -9,6 +9,9 @@ import '../services/location_service.dart';
 import 'widgets/marker_info_window.dart';
 import 'widgets/location_fab.dart';
 import 'widgets/floating_marker.dart';
+import 'widgets/tourist_spot_bottom_sheet.dart';
+import '../../public_data/services/visitseoul_api_service.dart';
+import '../../public_data/models/content_info.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -22,17 +25,20 @@ class _MapPageState extends State<MapPage> {
   final LocationService _locationService = LocationService();
   final CustomInfoWindowController _customInfoWindowController =
       CustomInfoWindowController();
+  final VisitSeoulApiService _visitSeoulApiService = VisitSeoulApiService();
 
   GoogleMapController? mapController;
   Position? _currentPosition;
   bool _isLoadingLocation = true;
   final Set<Marker> _markers = {};
   BitmapDescriptor? _customMarkerIcon;
+  BitmapDescriptor? _touristSpotMarkerIcon;
   double _currentZoom = 18.0;
   double _previousZoom = 18.0;
   StreamSubscription<Position>? _positionStreamSubscription;
   double _currentMarkerSize = 90.0;
   Offset? _markerScreenPosition;
+  List<ContentInfo> _touristSpots = [];
 
   final LatLng _center = const LatLng(37.5665, 126.9780);
 
@@ -46,10 +52,94 @@ class _MapPageState extends State<MapPage> {
   Future<void> _initializeMap() async {
     // 1. 먼저 커스텀 마커 로드
     await _loadCustomMarker();
-    // 2. 마커 로드 완료 후 현재 위치 가져오기
+    // 2. 관광지 마커 아이콘 로드
+    _loadTouristSpotMarker();
+    // 3. 관광지 데이터 가져오기 (비동기로 실행하여 지도 로딩 차단 방지)
+    _loadTouristSpots();
+    // 4. 마커 로드 완료 후 현재 위치 가져오기
     await _getCurrentLocation();
-    // 3. 실시간 위치 추적 시작
+    // 5. 실시간 위치 추적 시작
     _startLocationTracking();
+  }
+
+  /// 관광지 마커 아이콘 로드 (기본 빨간색 마커 사용)
+  void _loadTouristSpotMarker() {
+    _touristSpotMarkerIcon = BitmapDescriptor.defaultMarkerWithHue(
+      BitmapDescriptor.hueRed,
+    );
+  }
+
+  /// 관광지 데이터 가져오기
+  Future<void> _loadTouristSpots() async {
+    try {
+      print('🔵 관광지 데이터 로딩 시작');
+      final response = await _visitSeoulApiService.getContentList(
+        pageNo: 1,
+        langCodeId: 'ko',
+      );
+
+      if (response != null && response.data.isNotEmpty) {
+        print('✅ 관광지 ${response.data.length}개 로드 성공');
+
+        // 각 컨텐츠의 상세 정보 가져오기 (처음 10개만)
+        final cidList = response.data.take(10).map((item) => item.cid).toList();
+        final contents = await _visitSeoulApiService.getMultipleContents(cidList);
+
+        setState(() {
+          _touristSpots = contents;
+        });
+
+        // 관광지 마커 추가
+        _addTouristSpotMarkers();
+      } else {
+        print('⚠️ 관광지 데이터가 없습니다.');
+      }
+    } catch (e) {
+      print('❌ 관광지 데이터 로드 실패: $e');
+    }
+  }
+
+  /// 관광지 마커 추가
+  void _addTouristSpotMarkers() {
+    if (_touristSpotMarkerIcon == null) return;
+
+    for (var spot in _touristSpots) {
+      // 위도/경도 정보가 있는지 확인
+      if (spot.traffic?.mapPositionX == null ||
+          spot.traffic?.mapPositionY == null) {
+        continue;
+      }
+
+      try {
+        final double lat = double.parse(spot.traffic!.mapPositionY!);
+        final double lng = double.parse(spot.traffic!.mapPositionX!);
+        final position = LatLng(lat, lng);
+
+        final marker = Marker(
+          markerId: MarkerId('tourist_${spot.cid}'),
+          position: position,
+          icon: _touristSpotMarkerIcon!,
+          onTap: () => _showTouristSpotDetails(spot),
+        );
+
+        setState(() {
+          _markers.add(marker);
+        });
+        print('✅ 마커 추가: ${spot.postSj} ($lat, $lng)');
+      } catch (e) {
+        print('❌ 마커 생성 실패 (${spot.postSj}): $e');
+      }
+    }
+  }
+
+  /// 관광지 상세 정보 바텀 시트 표시
+  void _showTouristSpotDetails(ContentInfo spot) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => TouristSpotBottomSheet(spot: spot),
+    );
   }
 
   /// 실시간 위치 추적 시작
