@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/visitseoul_api_service.dart';
 import '../models/content_list_item.dart';
+import '../widgets/content_list_card.dart';
+import '../widgets/filter_bottom_sheet.dart';
 import 'content_detail_page.dart';
 
 class ContentListPage extends StatefulWidget {
@@ -103,120 +105,16 @@ class _ContentListPageState extends State<ContentListPage> {
 
   // 필터 바텀시트 표시
   void _showFilterBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        '필터',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // 언어 선택
-                  const Text('언어', style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('한국어'),
-                        selected: _selectedLang == 'ko',
-                        onSelected: (selected) {
-                          setModalState(() => _selectedLang = 'ko');
-                          setState(() => _selectedLang = 'ko');
-                        },
-                      ),
-                      ChoiceChip(
-                        label: const Text('English'),
-                        selected: _selectedLang == 'en',
-                        onSelected: (selected) {
-                          setModalState(() => _selectedLang = 'en');
-                          setState(() => _selectedLang = 'en');
-                        },
-                      ),
-                      ChoiceChip(
-                        label: const Text('日本語'),
-                        selected: _selectedLang == 'ja',
-                        onSelected: (selected) {
-                          setModalState(() => _selectedLang = 'ja');
-                          setState(() => _selectedLang = 'ja');
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // 정렬 선택
-                  const Text('정렬', style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('최신순'),
-                        selected: _selectedSort == 'latest',
-                        onSelected: (selected) {
-                          setModalState(() => _selectedSort = 'latest');
-                          setState(() => _selectedSort = 'latest');
-                        },
-                      ),
-                      ChoiceChip(
-                        label: const Text('가나다순'),
-                        selected: _selectedSort == 'abc',
-                        onSelected: (selected) {
-                          setModalState(() => _selectedSort = 'abc');
-                          setState(() => _selectedSort = 'abc');
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // 적용 버튼
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _loadContents(refresh: true);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('적용하기'),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
+    FilterBottomSheet.show(
+      context,
+      initialLang: _selectedLang,
+      initialSort: _selectedSort,
+      onApply: (lang, sort) {
+        setState(() {
+          _selectedLang = lang;
+          _selectedSort = sort;
+        });
+        _loadContents(refresh: true);
       },
     );
   }
@@ -419,185 +317,18 @@ class _ContentListPageState extends State<ContentListPage> {
 
                   // 큰 카드 아이템
                   final content = _contents[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ContentDetailPage(
-                                cid: content.cid,
-                              ),
-                            ),
-                          );
-                        },
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 큰 이미지 with 그라데이션
-                            Stack(
-                              children: [
-                                content.mainImg.isNotEmpty
-                                    ? Image.network(
-                                        content.mainImg,
-                                        width: double.infinity,
-                                        height: 240,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Container(
-                                            width: double.infinity,
-                                            height: 240,
-                                            color: Colors.grey[300],
-                                            child: Icon(
-                                              Icons.image,
-                                              size: 80,
-                                              color: Colors.grey[400],
-                                            ),
-                                          );
-                                        },
-                                      )
-                                    : Container(
-                                        width: double.infinity,
-                                        height: 240,
-                                        color: Colors.grey[300],
-                                        child: Icon(
-                                          Icons.image,
-                                          size: 80,
-                                          color: Colors.grey[400],
-                                        ),
-                                      ),
-
-                                // 그라데이션 오버레이
-                                Positioned.fill(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Colors.transparent,
-                                          Colors.black.withValues(alpha: 0.7),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                // 카테고리 태그
-                                if (content.cateDepth.isNotEmpty)
-                                  Positioned(
-                                    top: 12,
-                                    left: 12,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.9),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        content.cateDepth.first,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.blue[700],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-
-                                // 이미지 위 제목
-                                Positioned(
-                                  bottom: 16,
-                                  left: 16,
-                                  right: 16,
-                                  child: Text(
-                                    content.postSj,
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                      shadows: [
-                                        Shadow(
-                                          color: Colors.black26,
-                                          offset: Offset(0, 2),
-                                          blurRadius: 4,
-                                        ),
-                                      ],
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            // 콘텐츠 정보
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // 요약
-                                  Text(
-                                    content.sumry.trim(),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[700],
-                                      height: 1.5,
-                                    ),
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 12),
-
-                                  // 수정일과 화살표
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.schedule,
-                                            size: 14,
-                                            color: Colors.grey[500],
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            content.updtDtText,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[500],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      Icon(
-                                        Icons.arrow_forward,
-                                        color: Colors.blue[700],
-                                        size: 20,
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                  return ContentListCard(
+                    content: content,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ContentDetailPage(
+                            cid: content.cid,
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   );
                 },
                 childCount: _contents.length + 1,
