@@ -104,7 +104,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
                   backgroundColor: currentCharacter.themeColor,
                 ),
                 child: Text(
-                  '${currentCharacter.name} 선택하기',
+                  '${currentCharacter.name}와 시작하기',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

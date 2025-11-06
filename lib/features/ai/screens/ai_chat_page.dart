@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
@@ -9,6 +10,7 @@ import '../../public_data/services/visitseoul_api_service.dart';
 import '../../map/services/location_service.dart';
 import '../models/chat_message.dart';
 import '../models/chracter.dart';
+import '../models/recommendation.dart';
 import '../services/claude_service.dart';
 import '../services/character_storage_service.dart';
 import '../services/prompt_builder.dart';
@@ -148,9 +150,9 @@ class _AiChatPageState extends State<AiChatPage> {
       case 'cheongryong':
         return '안녕! 나는 ${character.name}이용! 오늘 어디 갈까용? 재미있는 곳 찾아줄게용!';
       case 'baekho':
-        return '어이! 나는 ${character.name}야. 서울 구석구석 다 아는 나랑 같이 돌아다녀보자고!';
+        return '어이! 나는 ${character.name}야. 서울 구석구석 다 아는 나랑 같이 돌아다녀보자고! 어디 가고 싶은 데 있어?';
       default:
-        return '안녕! 나는 ${character.name}이야. 서울 여행을 도와줄게!';
+        return '안녕! 나는 ${character.name}이야. 서울에서 너가 하루를 알차게 보내도록 도와줄게!';
     }
   }
 
@@ -243,8 +245,14 @@ class _AiChatPageState extends State<AiChatPage> {
         maxTokens: 2048,
       );
 
+      // 응답 파싱 (텍스트 + 추천 데이터)
+      final (textPart, recommendations) = _parseResponse(response);
+
       // Assistant 응답 추가
-      final assistantMessage = ChatMessage.assistant(response);
+      final assistantMessage = ChatMessage.assistant(
+        textPart,
+        recommendations: recommendations,
+      );
       setState(() {
         _messages.add(assistantMessage);
         _isLoading = false;
@@ -274,6 +282,51 @@ class _AiChatPageState extends State<AiChatPage> {
         );
       }
     });
+  }
+
+  /// Claude 응답에서 추천 데이터 파싱
+  ///
+  /// 응답 형식: 텍스트 + [RECOMMENDATIONS]JSON[/RECOMMENDATIONS]
+  /// 반환: (텍스트 부분, 추천 리스트)
+  (String, List<Recommendation>?) _parseResponse(String response) {
+    // [RECOMMENDATIONS]...[/RECOMMENDATIONS] 태그 찾기
+    final startTag = '[RECOMMENDATIONS]';
+    final endTag = '[/RECOMMENDATIONS]';
+
+    final startIndex = response.indexOf(startTag);
+    final endIndex = response.indexOf(endTag);
+
+    if (startIndex == -1 || endIndex == -1 || startIndex >= endIndex) {
+      // 추천 데이터가 없으면 원본 응답 그대로 반환
+      return (response, null);
+    }
+
+    // 텍스트 부분 추출 (추천 JSON 제외)
+    final textPart = response.substring(0, startIndex).trim();
+
+    // JSON 부분 추출
+    final jsonPart = response.substring(
+      startIndex + startTag.length,
+      endIndex,
+    ).trim();
+
+    try {
+      // JSON 파싱
+      final jsonData = jsonDecode(jsonPart) as Map<String, dynamic>;
+      final recommendationsJson = jsonData['recommendations'] as List<dynamic>;
+
+      // Recommendation 객체 리스트로 변환
+      final recommendations = recommendationsJson
+          .map((json) => Recommendation.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      return (textPart, recommendations);
+    } catch (e) {
+      print('❌ 추천 JSON 파싱 실패: $e');
+      print('JSON: $jsonPart');
+      // 파싱 실패 시 원본 응답 반환
+      return (response, null);
+    }
   }
 
   /// 카테고리 버튼 생성
@@ -363,8 +416,14 @@ class _AiChatPageState extends State<AiChatPage> {
         maxTokens: 2048,
       );
 
+      // 응답 파싱 (텍스트 + 추천 데이터)
+      final (textPart, recommendations) = _parseResponse(response);
+
       // Assistant 응답 추가
-      final assistantMessage = ChatMessage.assistant(response);
+      final assistantMessage = ChatMessage.assistant(
+        textPart,
+        recommendations: recommendations,
+      );
       setState(() {
         _messages.add(assistantMessage);
         _isLoading = false;
@@ -396,7 +455,7 @@ class _AiChatPageState extends State<AiChatPage> {
         ),
         title: Text(
           _selectedCharacter != null
-              ? '${_selectedCharacter!.name}와 채팅'
+              ? '${_selectedCharacter!.name}'
               : 'AI 채팅',
         ),
       ),
