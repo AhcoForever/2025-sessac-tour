@@ -12,6 +12,7 @@ import 'widgets/floating_marker.dart';
 import 'widgets/tourist_spot_bottom_sheet.dart';
 import '../../public_data/services/visitseoul_api_service.dart';
 import '../../public_data/models/content_info.dart';
+import '../../camera/screens/photo_capture_page.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -39,6 +40,11 @@ class _MapPageState extends State<MapPage> {
   double _currentMarkerSize = 90.0;
   Offset? _markerScreenPosition;
   List<ContentInfo> _touristSpots = [];
+
+  // 목적지 관련
+  ContentInfo? _selectedDestination;
+  double? _distanceToDestination;
+  bool _hasShownArrivalDialog = false;
 
   final LatLng _center = const LatLng(37.5665, 126.9780);
 
@@ -103,6 +109,13 @@ class _MapPageState extends State<MapPage> {
   void _addTouristSpotMarkers() {
     if (_touristSpotMarkerIcon == null) return;
 
+    // 기존 관광지 마커들 제거
+    setState(() {
+      _markers.removeWhere(
+        (m) => m.markerId.value.startsWith('tourist_'),
+      );
+    });
+
     for (var spot in _touristSpots) {
       // 위도/경도 정보가 있는지 확인
       if (spot.traffic?.mapPositionX == null ||
@@ -115,10 +128,16 @@ class _MapPageState extends State<MapPage> {
         final double lng = double.parse(spot.traffic!.mapPositionX!);
         final position = LatLng(lat, lng);
 
+        // 선택된 목적지는 초록색, 나머지는 빨간색
+        final isSelected = _selectedDestination?.cid == spot.cid;
+        final markerIcon = isSelected
+            ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen)
+            : _touristSpotMarkerIcon!;
+
         final marker = Marker(
           markerId: MarkerId('tourist_${spot.cid}'),
           position: position,
-          icon: _touristSpotMarkerIcon!,
+          icon: markerIcon,
           onTap: () => _showTouristSpotDetails(spot),
         );
 
@@ -138,7 +157,197 @@ class _MapPageState extends State<MapPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => TouristSpotBottomSheet(spot: spot),
+      builder: (context) => TouristSpotBottomSheet(
+        spot: spot,
+        onSetDestination: () => _setDestination(spot),
+      ),
+    );
+  }
+
+  /// 목적지 설정
+  void _setDestination(ContentInfo destination) {
+    setState(() {
+      _selectedDestination = destination;
+      _hasShownArrivalDialog = false;
+      _distanceToDestination = null;
+    });
+
+    // 관광지 마커 재생성 (선택된 목적지는 초록색으로)
+    _addTouristSpotMarkers();
+
+    // 사용자에게 알림
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.navigation, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '목적지 설정: ${destination.postSj}\n도착 시 사진을 찍을 수 있어요!',
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.green[700],
+        duration: const Duration(seconds: 4),
+      ),
+    );
+
+    // 목적지까지의 거리 계산
+    if (_currentPosition != null) {
+      _calculateDistance();
+    }
+  }
+
+  /// 목적지까지의 거리 계산
+  void _calculateDistance() {
+    if (_selectedDestination == null || _currentPosition == null) return;
+
+    if (_selectedDestination!.traffic?.mapPositionX == null ||
+        _selectedDestination!.traffic?.mapPositionY == null) {
+      return;
+    }
+
+    try {
+      final double destLat =
+          double.parse(_selectedDestination!.traffic!.mapPositionY!);
+      final double destLng =
+          double.parse(_selectedDestination!.traffic!.mapPositionX!);
+
+      final distance = Geolocator.distanceBetween(
+        _currentPosition!.latitude,
+        _currentPosition!.longitude,
+        destLat,
+        destLng,
+      );
+
+      setState(() {
+        _distanceToDestination = distance;
+      });
+
+      // 50m 이내 도달 확인
+      if (distance <= 50 && !_hasShownArrivalDialog) {
+        _showArrivalDialog();
+      }
+    } catch (e) {
+      print('❌ 거리 계산 실패: $e');
+    }
+  }
+
+  /// 도착 알림 다이얼로그
+  void _showArrivalDialog() {
+    setState(() {
+      _hasShownArrivalDialog = true;
+    });
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.celebration, color: Colors.amber[700], size: 28),
+            const SizedBox(width: 8),
+            const Text('도착했어요! 🎉'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${_selectedDestination!.postSj}에 도착하셨습니다!',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '5분 이내에 인증샷을 찍어주세요.',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 20, color: Colors.blue[700]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '사진은 마이페이지 보관함에 저장됩니다.',
+                      style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('나중에'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _navigateToPhotoCapture();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue[700],
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.camera_alt, size: 20),
+                SizedBox(width: 6),
+                Text('사진 찍기'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 카메라 페이지로 이동
+  void _navigateToPhotoCapture() {
+    if (_selectedDestination == null) return;
+
+    // 주소 정보 가져오기
+    final address = _selectedDestination!.traffic?.newAdres ??
+        _selectedDestination!.traffic?.adres ??
+        '주소 정보 없음';
+
+    // 좌표 정보 가져오기
+    final lat = _selectedDestination!.traffic?.mapPositionY != null
+        ? double.tryParse(_selectedDestination!.traffic!.mapPositionY!) ?? 0.0
+        : 0.0;
+    final lng = _selectedDestination!.traffic?.mapPositionX != null
+        ? double.tryParse(_selectedDestination!.traffic!.mapPositionX!) ?? 0.0
+        : 0.0;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PhotoCapturePage(
+          destinationName: _selectedDestination!.postSj,
+          destinationAddress: address,
+          latitude: lat,
+          longitude: lng,
+          destinationId: _selectedDestination!.cid,
+        ),
+      ),
     );
   }
 
@@ -160,6 +369,11 @@ class _MapPageState extends State<MapPage> {
 
       // 마커 화면 좌표 업데이트
       _updateMarkerScreenPosition();
+
+      // 목적지가 설정되어 있으면 거리 계산
+      if (_selectedDestination != null) {
+        _calculateDistance();
+      }
 
       // 지도를 새 위치로 부드럽게 이동
       if (mapController != null) {
@@ -402,6 +616,97 @@ class _MapPageState extends State<MapPage> {
             width: 280,
             offset: 50,
           ),
+
+          // 목적지까지 거리 표시
+          if (_selectedDestination != null && _distanceToDestination != null)
+            Positioned(
+              top: 60,
+              left: 16,
+              right: 16,
+              child: SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.navigation,
+                          color: Colors.green[700],
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedDestination!.postSj,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Text(
+                                  _distanceToDestination! < 1000
+                                      ? '${_distanceToDestination!.toInt()}m'
+                                      : '${(_distanceToDestination! / 1000).toStringAsFixed(1)}km',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: _distanceToDestination! <= 50
+                                        ? Colors.green[700]
+                                        : Colors.blue[700],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _distanceToDestination! <= 50
+                                      ? '도착!'
+                                      : '남음',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_distanceToDestination! <= 50)
+                        Icon(
+                          Icons.check_circle,
+                          color: Colors.green[700],
+                          size: 28,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
       floatingActionButton: LocationFab(

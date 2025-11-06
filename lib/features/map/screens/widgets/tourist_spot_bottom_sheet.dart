@@ -5,10 +5,12 @@ import '../../../public_data/models/content_info.dart';
 /// 관광지 상세 정보를 표시하는 바텀 시트
 class TouristSpotBottomSheet extends StatelessWidget {
   final ContentInfo spot;
+  final VoidCallback? onSetDestination;
 
   const TouristSpotBottomSheet({
     super.key,
     required this.spot,
+    this.onSetDestination,
   });
 
   @override
@@ -26,27 +28,29 @@ class TouristSpotBottomSheet extends StatelessWidget {
               topRight: Radius.circular(20),
             ),
           ),
-          child: Column(
+          child: Stack(
             children: [
-              // 드래그 핸들
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+              Column(
+                children: [
+                  // 드래그 핸들
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
 
-              // 스크롤 가능한 컨텐츠
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                  // 스크롤 가능한 컨텐츠
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                       // 썸네일 이미지
                       if (spot.mainImg.isNotEmpty)
                         ClipRRect(
@@ -234,11 +238,63 @@ class TouristSpotBottomSheet extends StatelessWidget {
                         ),
                       ],
 
-                      const SizedBox(height: 80), // 하단 여백
-                    ],
+                          const SizedBox(height: 80), // 하단 여백
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // 목적지 설정 버튼
+              if (onSetDestination != null)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, -5),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onSetDestination!();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue[700],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.location_on, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            '목적지로 설정하고 출발하기',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         );
