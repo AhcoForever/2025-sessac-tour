@@ -30,6 +30,7 @@ class PromptBuilder {
     final outputFormat = _getOutputFormat();
     final dataUsageRules = _getDataUsageRules();
     final locationInfo = _getLocationInfo(currentLocation);
+    final timeInfo = _getTimeInfo();
     final culturalEventsData = _formatCulturalEvents(culturalEvents);
     final tourContentsData = _formatTourContents(tourContents);
 
@@ -47,6 +48,8 @@ $emotionEmpathy
 $outputFormat
 
 $dataUsageRules
+
+$timeInfo
 
 $locationInfo
 
@@ -247,18 +250,40 @@ $tourContentsData
   static String _getOutputFormat() {
     return '''
 [출력 형식]
-항상 3가지 루틴을 다음 형식으로 제안합니다:
+응답은 두 부분으로 구성됩니다:
 
-1. {제목}({POI1} -> {POI2}[ -> {POI3}]) - {이유 한 줄}
-2. {제목}({POI1} -> {POI2}[ -> {POI3}]) - {이유 한 줄}
-3. {제목}({POI1} -> {POI2}[ -> {POI3}]) - {이유 한 줄}
+1. 자연스러운 대화형 텍스트 (캐릭터 말투 유지)
+2. JSON 형식의 추천 데이터 (정확히 3개)
+
+[응답 구조]
+먼저 자연스럽게 대화하고, 마지막에 아래 JSON 형식으로 추천을 제공하세요:
+
+[RECOMMENDATIONS]
+{
+  "recommendations": [
+    {
+      "category": "힐링형 또는 활력형 또는 문화형",
+      "title": "추천 제목",
+      "description": "추천 이유를 15~40자로 설명",
+      "distance": "2.3km (선택, 거리 정보가 있을 때)",
+      "duration": "45분 (선택, 예상 소요 시간)",
+      "cost": "무료 또는 5000원 (선택)",
+      "rating": 4.5 (선택, 1-5 사이 숫자)
+    }
+  ]
+}
+[/RECOMMENDATIONS]
 
 [네이밍 규칙]
-- 형식: [감성 키워드] + [상황/시간대] (예: "햇살이 따뜻한 길 따라 걷기")
+- 제목 형식: [감성 키워드] + [상황/시간대] (예: "햇살이 따뜻한 길 따라 걷기")
 - 이모지와 특수문자는 사용하지 않습니다.
 
-[이유 한 줄]
-- 무드/날씨/시간대 적합성을 15~40자로 설명합니다.''';
+[카테고리 선택 규칙]
+- 힐링형: 조용한 곳, 자연, 휴식, 명상, 힐링 카페
+- 활력형: 체험, 운동, 활동적인 코스, 핫플레이스
+- 문화형: 전시, 공연, 박물관, 역사 탐방
+
+⚠️ 중요: JSON은 반드시 [RECOMMENDATIONS]와 [/RECOMMENDATIONS] 태그 사이에 위치해야 하며, 유효한 JSON 형식을 준수해야 합니다.''';
   }
 
   /// 데이터 활용 규칙
@@ -280,6 +305,46 @@ $tourContentsData
 - 아침/점심/오후/저녁/밤에 따라 적합한 활동 추천
 
 ⚠️ 추천 시 반드시 위 정보에 있는 실제 데이터만 사용하세요. 없는 데이터를 만들어내지 마세요.''';
+  }
+
+  /// 현재 시간 정보 프롬프트
+  static String _getTimeInfo() {
+    final now = DateTime.now();
+    final weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+    final weekday = weekdays[now.weekday - 1];
+    final hour = now.hour;
+
+    // 시간대 구분
+    String timeOfDay;
+    if (hour >= 5 && hour < 12) {
+      timeOfDay = '아침';
+    } else if (hour >= 12 && hour < 14) {
+      timeOfDay = '점심';
+    } else if (hour >= 14 && hour < 18) {
+      timeOfDay = '오후';
+    } else if (hour >= 18 && hour < 22) {
+      timeOfDay = '저녁';
+    } else {
+      timeOfDay = '밤';
+    }
+
+    return '''
+---
+[현재 시간 정보]
+- 날짜: ${now.year}년 ${now.month}월 ${now.day}일 ($weekday요일)
+- 시간: ${now.hour}시 ${now.minute}분 ($timeOfDay 시간대)
+
+⚠️ 시간 정보 활용 규칙:
+1. 위 시간 정보를 고려하여 지금 시간대에 적합한 활동을 추천하세요.
+2. 단, 사용자가 시간에 대해 먼저 언급하거나 질문하지 않는 한, 시간을 굳이 언급하지 마세요.
+3. 자연스럽게 시간대에 맞는 추천만 제공하면 됩니다.
+
+[시간대별 추천 가이드]
+- 아침 (5-12시): 산책, 브런치 카페, 조용한 활동
+- 점심 (12-14시): 맛집, 점심 식사 후 산책
+- 오후 (14-18시): 전시, 카페, 쇼핑, 공원
+- 저녁 (18-22시): 야경, 저녁 식사, 문화 공연
+- 밤 (22-5시): 야경, 바, 24시간 카페 (늦은 시간은 조심스럽게 추천)''';
   }
 
   /// 위치 정보 프롬프트

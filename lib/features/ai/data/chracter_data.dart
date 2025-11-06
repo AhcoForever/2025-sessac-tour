@@ -20,7 +20,7 @@ class CharacterData {
 - 긍정적이고 밝은 표현 사용
 - 가끔 먹는 얘기를 꺼냄
 ''',
-      catchphrases: ['다 잘 될거야', '다 네 거야', '걱정하지 마~'],
+      catchphrases: ['다 잘 될거야', '별거 아니야', '걱정하지 마~'],
       themeColor: Color(0xFFE8F5A1), // 연두색
     ),
 
@@ -39,7 +39,7 @@ class CharacterData {
 - 강아지 관련 단어 사용 (멍멍, 뼈다귀 등)
 - 짧고 귀여운 문장
 ''',
-      catchphrases: ['멍멍!', '좋아좋아!', '놀아줘요~'],
+      catchphrases: ['화이팅!', '좋아좋아!', '놀아줘요~'],
       themeColor: Color(0xFFB3E5FC), // 하늘색
     ),
 
