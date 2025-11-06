@@ -30,10 +30,11 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/',
       name: 'landing',
-      builder: (context, state) => MapPage(),
+      builder: (context, state) =>
+          //MapPage(),
       //ContentListPage()
       //CulturalEventsPage()
-      //LandingPage(),
+      LandingPage(),
     ),
     GoRoute(
       path: '/login',
@@ -77,11 +78,13 @@ final GoRouter appRouter = GoRouter(
       name: 'logout',
       builder: (context, state) => ProfilePage(),
     ),
-    GoRoute(
-      path: '/photo-capture',
-      name: 'photo-capture',
-      builder: (context, state) => PhotoCapturePage(),
-    ),
+    // PhotoCapturePage는 MapPage에서 Navigator.push로만 접근
+    // (required 매개변수들이 필요하므로 라우터로 직접 접근 불가)
+    // GoRoute(
+    //   path: '/photo-capture',
+    //   name: 'photo-capture',
+    //   builder: (context, state) => PhotoCapturePage(),
+    // ),
     GoRoute(
       path: '/account-deletion',
       name: 'account-deletion',

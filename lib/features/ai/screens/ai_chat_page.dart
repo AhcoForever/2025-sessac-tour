@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../core/config.dart';
 import '../../public_data/models/cultural_event.dart';
 import '../../public_data/models/content_list_item.dart';
 import '../../public_data/services/seoulapi_service.dart';
 import '../../public_data/services/visitseoul_api_service.dart';
+import '../../map/services/location_service.dart';
 import '../models/chat_message.dart';
 import '../models/chracter.dart';
 import '../services/claude_service.dart';
 import '../services/character_storage_service.dart';
+import '../services/prompt_builder.dart';
+import 'widgets/message_bubble.dart';
 
 class AiChatPage extends StatefulWidget {
   const AiChatPage({super.key});
@@ -25,61 +29,59 @@ class _AiChatPageState extends State<AiChatPage> {
   late ClaudeService _claudeService;
   final SeoulApiService _seoulApiService = SeoulApiService();
   final VisitSeoulApiService _visitSeoulApiService = VisitSeoulApiService();
+  final LocationService _locationService = LocationService();
 
   bool _isLoading = false;
   bool _isLoadingData = true; // 데이터 로딩 중
   List<CulturalEvent> _culturalEvents = [];
-  String _eventsDataText = '';
   List<ContentListItem> _tourContents = [];
-  String _tourContentsDataText = '';
   Character? _selectedCharacter; // 선택된 캐릭터
+  String? _selectedCategory; // 선택된 카테고리
+  Position? _currentPosition; // 현재 위치
+  String? _currentLocation; // 현재 위치 설명 (예: "강남구")
 
-  // 🎯 시스템 프롬프트 (선택된 캐릭터 기반)
+  // 카테고리별 예시 질문
+  final Map<String, List<String>> _exampleQuestions = {
+    '힐링': [
+      '오늘 날씨 좋은데 뭐 할까요',
+      '조용한 곳에서 쉬고 싶어요',
+      '산책하기 좋은 곳 추천해주세요',
+    ],
+    '무기력': [
+      '집에만 있었는데 뭐 하면 좋을까요',
+      '기분 전환할 수 있는 곳 알려주세요',
+      '가벼운 활동 추천해주세요',
+    ],
+    '외로움': [
+      '사람 많은 곳 추천해주세요',
+      '혼자 가기 좋은 카페 알려주세요',
+      '새로운 사람들을 만날 수 있는 활동 추천해주세요',
+    ],
+    '날씨': [
+      '오늘 날씨 좋은데 뭐 할까요',
+      '실내에서 할 수 있는 활동 추천해줘',
+      '비 오는 날 갈 만한 곳 있을까요',
+    ],
+    '예산': [
+      '무료로 즐길 수 있는 곳 알려주세요',
+      '저렴하게 즐길 수 있는 활동 추천해주세요',
+      '가성비 좋은 맛집 알려주세요',
+    ],
+    '근처': [
+      '지금 있는 곳 근처에서 뭐 할까요',
+      '가까운 곳 추천해주세요',
+      '도보로 갈 수 있는 곳 알려주세요',
+    ],
+  };
+
+  // 🎯 시스템 프롬프트 생성 (PromptBuilder 사용)
   String get _systemPrompt {
-    String characterPrompt = '';
-
-    if (_selectedCharacter != null) {
-      // 선택된 캐릭터의 프롬프트 사용
-      characterPrompt = _selectedCharacter!.getSystemPrompt();
-    } else {
-      // 기본 프롬프트 (폴백)
-      characterPrompt = '''
-당신은 "소울해치"라는 이름의 친근한 서울 여행 가이드입니다.
-
-역할:
-- 사용자의 기분과 상황을 파악하여 서울의 명소, 맛집, 문화 이벤트를 추천합니다
-- 친근하고 따뜻한 말투로 대화합니다
-- 이모지를 적절히 사용하여 생동감 있게 표현합니다
-
-말투 특징:
-- "~야", "~해" 등 반말을 사용합니다
-- 공감하고 격려하는 톤으로 대화합니다
-- 예: "오늘 기분이 어때?", "그렇구나! 그럼 이런 곳 어때?"
-''';
-    }
-
-    return '''
-$characterPrompt
-
-추천 시 포함할 정보:
-- 장소 이름과 위치
-- 해당 장소가 사용자 기분에 맞는 이유
-- 간단한 팁이나 특징
-
----
-[서울시 현재 진행 중인 문화 행사 정보]
-$_eventsDataText
-
-위 정보를 참고하여 사용자에게 적합한 행사를 추천해주세요.
-행사 추천 시 반드시 위 정보에 있는 실제 데이터만 사용하세요.
-
----
-[서울 관광 콘텐츠 정보]
-$_tourContentsDataText
-
-위 관광 콘텐츠 정보를 참고하여 사용자에게 적합한 관광지, 맛집, 체험을 추천해주세요.
-추천 시 반드시 위 정보에 있는 실제 데이터만 사용하세요.
-''';
+    return PromptBuilder.buildSystemPrompt(
+      character: _selectedCharacter,
+      culturalEvents: _culturalEvents,
+      tourContents: _tourContents,
+      currentLocation: _currentLocation,
+    );
   }
 
   @override
@@ -98,6 +100,25 @@ $_tourContentsDataText
     _loadCulturalEvents();
     // VisitSeoul 관광 콘텐츠 데이터 로드
     _loadTourContents();
+    // 위치 정보 로드
+    _loadLocation();
+  }
+
+  /// 위치 정보 로드
+  Future<void> _loadLocation() async {
+    try {
+      final position = await _locationService.getCurrentLocation();
+
+      if (position != null) {
+        setState(() {
+          _currentPosition = position;
+          // 간단하게 위도/경도를 저장 (추후 Geocoding으로 주소 변환 가능)
+          _currentLocation = '위도: ${position.latitude.toStringAsFixed(4)}, 경도: ${position.longitude.toStringAsFixed(4)}';
+        });
+      }
+    } catch (e) {
+      // 위치 정보 로드 실패 시 무시
+    }
   }
 
   /// 저장된 캐릭터 불러오기
@@ -113,7 +134,7 @@ $_tourContentsDataText
       welcomeMessage = _getWelcomeMessage(_selectedCharacter!);
     } else {
       welcomeMessage =
-          '"안녕💫 나는 소울해치야! 오늘 너의 기분을 센싱해서 서울의 하루를 예쁘게 디자인해줄게🌷 지금 기분은 어때?"';
+          '안녕. 나는 소울해치야. 오늘 너의 기분을 센싱해서 서울의 하루를 예쁘게 디자인해줄게. 지금 기분은 어때?';
     }
 
     _messages.add(ChatMessage.assistant(welcomeMessage));
@@ -123,13 +144,13 @@ $_tourContentsDataText
   String _getWelcomeMessage(Character character) {
     switch (character.id) {
       case 'haetchi':
-        return '안녕💫 나는 ${character.name}야! 오늘 너의 기분을 센싱해서 서울의 하루를 예쁘게 디자인해줄게🌷 지금 기분은 어때?';
+        return '안녕. 나는 ${character.name}야. 오늘 너의 기분을 센싱해서 서울의 하루를 예쁘게 디자인해줄게. 지금 기분은 어때?';
       case 'cheongryong':
-        return '멍멍! 나는 ${character.name}! 오늘 어디 갈까? 재미있는 곳 찾아줄게!';
+        return '안녕! 나는 ${character.name}이용! 오늘 어디 갈까용? 재미있는 곳 찾아줄게용!';
       case 'baekho':
         return '어이! 나는 ${character.name}야. 서울 구석구석 다 아는 나랑 같이 돌아다녀보자고!';
       default:
-        return '안녕! 나는 ${character.name}! 서울 여행을 도와줄게!';
+        return '안녕! 나는 ${character.name}이야. 서울 여행을 도와줄게!';
     }
   }
 
@@ -146,21 +167,8 @@ $_tourContentsDataText
         endIndex: 20,
       );
 
-      // 데이터를 텍스트로 포맷팅
-      final buffer = StringBuffer();
-      for (int i = 0; i < events.length; i++) {
-        final event = events[i];
-        buffer.writeln('${i + 1}. ${event.title}');
-        buffer.writeln('   - 장소: ${event.place} (${event.guName})');
-        buffer.writeln('   - 기간: ${event.startDate} ~ ${event.endDate}');
-        buffer.writeln('   - 분류: ${event.codeName}');
-        buffer.writeln('   - 요금: ${event.useFee}');
-        buffer.writeln();
-      }
-
       setState(() {
         _culturalEvents = events;
-        _eventsDataText = buffer.toString();
         _isLoadingData = false;
       });
 
@@ -168,7 +176,7 @@ $_tourContentsDataText
     } catch (e) {
       print('❌ 문화행사 로드 실패: $e');
       setState(() {
-        _eventsDataText = '현재 문화행사 정보를 불러올 수 없습니다.';
+        _culturalEvents = [];
         _isLoadingData = false;
       });
     }
@@ -191,22 +199,8 @@ $_tourContentsDataText
             .take(20)
             .toList();
 
-        // 데이터를 텍스트로 포맷팅
-        final buffer = StringBuffer();
-        for (int i = 0; i < ongoingContents.length; i++) {
-          final content = ongoingContents[i];
-          buffer.writeln('${i + 1}. ${content.postSj}');
-          buffer.writeln('   - 카테고리: ${content.cateDepth.join(' > ')}');
-          if (content.schdulInfoBgnde.isNotEmpty) {
-            buffer.writeln('   - 기간: ${content.schdulInfoBgnde} ~ ${content.schdulInfoEndde}');
-          }
-          buffer.writeln('   - 요약: ${content.sumry}');
-          buffer.writeln();
-        }
-
         setState(() {
           _tourContents = ongoingContents;
-          _tourContentsDataText = buffer.toString();
         });
 
         print('✅ 관광 콘텐츠 ${ongoingContents.length}개 로드 완료');
@@ -214,7 +208,7 @@ $_tourContentsDataText
     } catch (e) {
       print('❌ 관광 콘텐츠 로드 실패: $e');
       setState(() {
-        _tourContentsDataText = '현재 관광 콘텐츠 정보를 불러올 수 없습니다.';
+        _tourContents = [];
       });
     }
   }
@@ -269,60 +263,6 @@ $_tourContentsDataText
     }
   }
 
-  /// 스트리밍 방식으로 메시지 전송 (실시간 타이핑 효과)
-  Future<void> _sendMessageStream() async {
-    final text = _messageController.text.trim();
-    if (text.isEmpty || _isLoading) return;
-
-    // 사용자 메시지 추가
-    final userMessage = ChatMessage.user(text);
-    setState(() {
-      _messages.add(userMessage);
-      _isLoading = true;
-    });
-
-    _messageController.clear();
-    _scrollToBottom();
-
-    // Assistant 메시지 플레이스홀더 추가
-    final assistantMessage = ChatMessage.assistant('');
-    setState(() {
-      _messages.add(assistantMessage);
-    });
-
-    try {
-      StringBuffer fullResponse = StringBuffer();
-
-      await for (var chunk in _claudeService.sendMessageStream(
-        messages: _messages.where((msg) => msg != assistantMessage).toList(),
-        systemPrompt: _systemPrompt,
-        maxTokens: 2048,
-      )) {
-        fullResponse.write(chunk);
-
-        // 메시지 업데이트
-        setState(() {
-          _messages[_messages.length - 1] = ChatMessage.assistant(
-            fullResponse.toString(),
-          );
-        });
-
-        _scrollToBottom();
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _messages[_messages.length - 1] = ChatMessage.assistant(
-          '죄송합니다. 오류가 발생했습니다: ${e.toString()}',
-        );
-        _isLoading = false;
-      });
-    }
-  }
-
   /// 채팅 스크롤을 맨 아래로 이동
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -334,6 +274,113 @@ $_tourContentsDataText
         );
       }
     });
+  }
+
+  /// 카테고리 버튼 생성
+  Widget _buildCategoryButton(String category, String emoji) {
+    final isSelected = _selectedCategory == category;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          // 같은 카테고리를 누르면 토글 (닫기)
+          _selectedCategory = isSelected ? null : category;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              emoji,
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              category,
+              style: TextStyle(
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                    : Theme.of(context).colorScheme.onSurface,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 예시 질문 버튼 생성
+  Widget _buildExampleQuestion(String question) {
+    return GestureDetector(
+      onTap: () {
+        // 예시 질문 클릭 시 자동으로 전송
+        _sendExampleQuestion(question);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          question,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 예시 질문 전송
+  Future<void> _sendExampleQuestion(String question) async {
+    if (_isLoading) return;
+
+    // 예시 질문을 사용자 메시지로 추가
+    final userMessage = ChatMessage.user(question);
+    setState(() {
+      _messages.add(userMessage);
+      _isLoading = true;
+      _selectedCategory = null; // 예시 질문 전송 후 카테고리 선택 해제
+    });
+
+    _scrollToBottom();
+
+    try {
+      // Claude API 호출
+      final response = await _claudeService.sendMessage(
+        messages: _messages,
+        systemPrompt: _systemPrompt,
+        maxTokens: 2048,
+      );
+
+      // Assistant 응답 추가
+      final assistantMessage = ChatMessage.assistant(response);
+      setState(() {
+        _messages.add(assistantMessage);
+        _isLoading = false;
+      });
+
+      _scrollToBottom();
+    } catch (e) {
+      // 오류 처리
+      setState(() {
+        _messages.add(ChatMessage.assistant(
+          '죄송합니다. 오류가 발생했습니다: ${e.toString()}',
+        ));
+        _isLoading = false;
+      });
+      _scrollToBottom();
+    }
   }
 
   @override
@@ -363,7 +410,7 @@ $_tourContentsDataText
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
-                return _MessageBubble(
+                return MessageBubble(
                   message: message,
                   character: _selectedCharacter,
                 );
@@ -401,6 +448,58 @@ $_tourContentsDataText
                   ),
                   SizedBox(width: 8),
                   Text('답변 생성 중...'),
+                ],
+              ),
+            ),
+
+          // 감정 태그 버튼
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildCategoryButton('힐링', '🌿'),
+                  const SizedBox(width: 8),
+                  _buildCategoryButton('무기력', '😔'),
+                  const SizedBox(width: 8),
+                  _buildCategoryButton('외로움', '💙'),
+                  const SizedBox(width: 8),
+                  _buildCategoryButton('날씨', '☀️'),
+                  const SizedBox(width: 8),
+                  _buildCategoryButton('예산', '💰'),
+                  const SizedBox(width: 8),
+                  _buildCategoryButton('근처', '📍'),
+                ],
+              ),
+            ),
+          ),
+
+          // 예시 질문 표시
+          if (_selectedCategory != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '예시 질문:',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.6),
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _exampleQuestions[_selectedCategory]!
+                        .map((question) => _buildExampleQuestion(question))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
@@ -452,101 +551,5 @@ $_tourContentsDataText
         ],
       ),
     );
-  }
-}
-
-/// 메시지 버블 위젯
-class _MessageBubble extends StatelessWidget {
-  final ChatMessage message;
-  final Character? character;
-
-  const _MessageBubble({
-    required this.message,
-    this.character,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isUser = message.role == MessageRole.user;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!isUser) ...[
-            CircleAvatar(
-              backgroundColor:
-                  character?.themeColor ?? Theme.of(context).colorScheme.primary,
-              child: character != null
-                  ? ClipOval(
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Image.asset(
-                          character!.imagePath,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(Icons.smart_toy, color: Colors.white);
-                          },
-                        ),
-                      ),
-                    )
-                  : const Icon(Icons.smart_toy, color: Colors.white),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isUser
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    message.content,
-                    style: TextStyle(
-                      color: isUser
-                          ? Colors.white
-                          : Theme.of(context).colorScheme.onSurface,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatTime(message.timestamp),
-                    style: TextStyle(
-                      color: isUser
-                          ? Colors.white70
-                          : Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.6),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (isUser) ...[
-            const SizedBox(width: 8),
-            CircleAvatar(
-              child: const Icon(Icons.person, color: Colors.white),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  String _formatTime(DateTime time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 }
