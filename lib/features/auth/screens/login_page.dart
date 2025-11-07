@@ -94,7 +94,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 // 서브 타이틀
                 Text(
-                  'DESIGN YOUR SOULFUL SEOUL LIFE',
+                  'Design your Soulful Seoul Life',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
