@@ -84,7 +84,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 // 앱 이름
                 Text(
-                  'Travel AI',
+                  'SOFE',
                   style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -94,7 +94,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 // 서브 타이틀
                 Text(
-                  'AI가 추천하는 완벽한 여행',
+                  'DESIGN YOUR SOULFUL SEOUL LIFE',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

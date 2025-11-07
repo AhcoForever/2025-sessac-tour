@@ -1,16 +1,30 @@
-# sessactour
+# **서울(soul)이랑 놀러갈래? SOFE와 함께! — Design your Soulful Seoul Life, SOFE**
+### **Who we are**
+2025 새싹 해커톤 참가를 위한 프로젝트 입니다.
+- 팀 명 : Sessac Tour (새싹투어)
+- 멤버 : 김민영(@AhcoForever), 김수현(@artishk52), 소아연(@ayeoniiii), 유승화(@9121awh)
 
-새싹 해커톤 참가를 위한 프로젝트 입니다.
+## **SOFE**
+- 앱 이름 : SOFE(소프)
+- 슬로건 : DESIGN YOUR **SO**ULFUL SEOUL LI**FE**
+- 의미 : 당신의 하루에 말을 걸고, 서울이 함께 걷는 일상을 경험
+- 캐릭터 세계관 : 서울시 공식 캐릭터 SoulFriends (소울프렌즈) - 댕댕청룡, 소울해치, 돌격백호가 "오늘은 어떤 하루를 보내고 싶어요?"하고 말을 건다.
+- 핵심 메시지 : 서울의 다양한 여가 데이터를 기반으로, 지친 청년의 하루를 다시 '움직이게' 만드는 감정형 여가 서비스.
 
-## Getting Started
+### **SOFE 앱 서비스 활용 방안**
 
-This project is a starting point for a Flutter application.
+#### **🌱 ① 청년 일상 속 여가 루틴화**일
 
-A few resources to get you started if this is your first Flutter project:
+- 일회성 이벤트가 아니라, 감정, 관심사 기반 루틴 설계를 통해 “매일 가능한 서울의 여가”를 제시.
+- 운동, 휴식, 교류 등 카테고리별 루틴을 지속적으로 추천.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+#### **🌿 ② 디지털 과의존 완화**
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- ‘핸드폰 내려놓기’를 강요하지 않고, 캐릭터 대화를 통해 자연스럽게 오프라인 행동으로 이어지게 함.
+- “오늘은 햇살 좋은 공원에서 쉬어볼까요?” 식의 제안으로 전환을 유도.
+
+#### **💞 ③ 정서적 회복과 연결감**
+
+- 루틴을 수행하면 감정과 사진을 기록 → 주간 감정리포트 제공.
+- 캐릭터가 이전 감정 패턴을 기억해 “요즘은 힐링 루틴이 잘 맞는 것 같아요.”처럼 피드백.
+- AI가 개인의 정서 리듬을 학습해 ‘정서적 안정 루틴’을 만들어줌.

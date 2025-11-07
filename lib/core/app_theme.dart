@@ -33,6 +33,7 @@ abstract final class AppTheme {
     visualDensity: FlexColorScheme.comfortablePlatformDensity,
     cupertinoOverrideTheme: const CupertinoThemeData(applyThemeToAll: true),
     useMaterial3: false,
+    fontFamily: 'Pretendard',
   );
 
   // The FlexColorScheme defined dark mode ThemeData.
@@ -68,5 +69,6 @@ abstract final class AppTheme {
     visualDensity: FlexColorScheme.comfortablePlatformDensity,
     cupertinoOverrideTheme: const CupertinoThemeData(applyThemeToAll: true),
     useMaterial3: false,
+    fontFamily: 'Pretendard',
   );
 }
