@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/cultural_event.dart';
+import '../models/night_spot.dart';
 
 class SeoulApiService {
   // API 키 입력 :  서울데이터광장
@@ -58,6 +59,51 @@ class SeoulApiService {
       print('❌ API 호출 오류: $e');
       print('❌ 스택 트레이스: $stackTrace');
       return [];
+    }
+  }
+
+  // 서울시 야경명소 정보 가져오기
+  Future<NightSpotResponse?> getNightSpots({
+    int startIndex = 1,
+    int endIndex = 100,
+  }) async {
+    final url = '$_baseUrl/$_apiKey/json/viewNightSpot/$startIndex/$endIndex/';
+
+    print('🌙 야경명소 API 호출 시작');
+    print('🔗 요청 URL: $url');
+
+    try {
+      final response = await http.get(Uri.parse(url));
+
+      print('📥 응답 상태 코드: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+
+        // 데이터 존재 여부 확인
+        if (jsonData['viewNightSpot'] != null) {
+          final nightSpotResponse = NightSpotResponse.fromJson(jsonData);
+
+          if (nightSpotResponse.result.isSuccess) {
+            print('✅ 야경명소 ${nightSpotResponse.row.length}개 로드 성공');
+            return nightSpotResponse;
+          } else {
+            print('⚠️ API 결과 코드: ${nightSpotResponse.result.code}');
+            print('⚠️ 메시지: ${nightSpotResponse.result.message}');
+            return null;
+          }
+        } else {
+          print('⚠️ viewNightSpot 데이터가 null입니다.');
+          return null;
+        }
+      } else {
+        print('❌ HTTP 에러: ${response.statusCode}');
+        return null;
+      }
+    } catch (e, stackTrace) {
+      print('❌ 야경명소 API 호출 오류: $e');
+      print('❌ 스택 트레이스: $stackTrace');
+      return null;
     }
   }
 }

@@ -25,9 +25,6 @@ class VisitSeoulApiService{
         }),
       );
 
-      print('상태 코드: ${response.statusCode}');
-      print('응답 본문: ${response.body}');
-
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
 
@@ -35,15 +32,15 @@ class VisitSeoulApiService{
         if (jsonData['result_code'] == 200 && jsonData['data'] != null) {
           return ContentInfo.fromJson(jsonData['data']);
         } else {
-          print('API 에러: ${jsonData['result_message']}');
+          // 에러는 조용히 무시 (일부 CID는 상세 정보가 없을 수 있음)
           return null;
         }
       } else {
-        print('HTTP 에러: ${response.statusCode}');
+        // HTTP 에러도 조용히 무시
         return null;
       }
     } catch (e) {
-      print('API 호출 오류: $e');
+      // 예외도 조용히 무시
       return null;
     }
 
