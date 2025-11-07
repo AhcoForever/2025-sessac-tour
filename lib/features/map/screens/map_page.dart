@@ -11,7 +11,9 @@ import 'widgets/location_fab.dart';
 import 'widgets/floating_marker.dart';
 import 'widgets/tourist_spot_bottom_sheet.dart';
 import '../../public_data/services/visitseoul_api_service.dart';
+import '../../public_data/services/seoulapi_service.dart';
 import '../../public_data/models/content_info.dart';
+import '../../public_data/models/night_spot.dart';
 import '../../camera/screens/photo_capture_page.dart';
 
 class MapPage extends StatefulWidget {
@@ -27,6 +29,7 @@ class _MapPageState extends State<MapPage> {
   final CustomInfoWindowController _customInfoWindowController =
       CustomInfoWindowController();
   final VisitSeoulApiService _visitSeoulApiService = VisitSeoulApiService();
+  final SeoulApiService _seoulApiService = SeoulApiService();
 
   GoogleMapController? mapController;
   Position? _currentPosition;
@@ -34,12 +37,14 @@ class _MapPageState extends State<MapPage> {
   final Set<Marker> _markers = {};
   BitmapDescriptor? _customMarkerIcon;
   BitmapDescriptor? _touristSpotMarkerIcon;
+  BitmapDescriptor? _nightSpotMarkerIcon;
   double _currentZoom = 18.0;
   double _previousZoom = 18.0;
   StreamSubscription<Position>? _positionStreamSubscription;
   double _currentMarkerSize = 90.0;
   Offset? _markerScreenPosition;
   List<ContentInfo> _touristSpots = [];
+  List<NightSpot> _nightSpots = [];
 
   // 목적지 관련
   ContentInfo? _selectedDestination;
@@ -60,11 +65,15 @@ class _MapPageState extends State<MapPage> {
     await _loadCustomMarker();
     // 2. 관광지 마커 아이콘 로드
     _loadTouristSpotMarker();
-    // 3. 관광지 데이터 가져오기 (비동기로 실행하여 지도 로딩 차단 방지)
+    // 3. 야경명소 마커 아이콘 로드
+    _loadNightSpotMarker();
+    // 4. 관광지 데이터 가져오기 (비동기로 실행하여 지도 로딩 차단 방지)
     _loadTouristSpots();
-    // 4. 마커 로드 완료 후 현재 위치 가져오기
+    // 5. 야경명소 데이터 가져오기
+    _loadNightSpots();
+    // 6. 마커 로드 완료 후 현재 위치 가져오기
     await _getCurrentLocation();
-    // 5. 실시간 위치 추적 시작
+    // 7. 실시간 위치 추적 시작
     _startLocationTracking();
   }
 
@@ -72,6 +81,13 @@ class _MapPageState extends State<MapPage> {
   void _loadTouristSpotMarker() {
     _touristSpotMarkerIcon = BitmapDescriptor.defaultMarkerWithHue(
       BitmapDescriptor.hueRed,
+    );
+  }
+
+  /// 야경명소 마커 아이콘 로드 (파란색 마커 사용)
+  void _loadNightSpotMarker() {
+    _nightSpotMarkerIcon = BitmapDescriptor.defaultMarkerWithHue(
+      BitmapDescriptor.hueBlue,
     );
   }
 
@@ -102,6 +118,32 @@ class _MapPageState extends State<MapPage> {
       }
     } catch (e) {
       print('❌ 관광지 데이터 로드 실패: $e');
+    }
+  }
+
+  /// 야경명소 데이터 가져오기
+  Future<void> _loadNightSpots() async {
+    try {
+      print('🌙 야경명소 데이터 로딩 시작');
+      final response = await _seoulApiService.getNightSpots(
+        startIndex: 1,
+        endIndex: 100,
+      );
+
+      if (response != null && response.row.isNotEmpty) {
+        print('✅ 야경명소 ${response.row.length}개 로드 성공');
+
+        setState(() {
+          _nightSpots = response.row;
+        });
+
+        // 야경명소 마커 추가
+        _addNightSpotMarkers();
+      } else {
+        print('⚠️ 야경명소 데이터가 없습니다.');
+      }
+    } catch (e) {
+      print('❌ 야경명소 데이터 로드 실패: $e');
     }
   }
 
@@ -149,6 +191,196 @@ class _MapPageState extends State<MapPage> {
         print('❌ 마커 생성 실패 (${spot.postSj}): $e');
       }
     }
+  }
+
+  /// 야경명소 마커 추가
+  void _addNightSpotMarkers() {
+    if (_nightSpotMarkerIcon == null) return;
+
+    // 기존 야경명소 마커들 제거
+    setState(() {
+      _markers.removeWhere(
+        (m) => m.markerId.value.startsWith('nightspot_'),
+      );
+    });
+
+    for (var spot in _nightSpots) {
+      // 위도/경도 정보가 있는지 확인
+      if (spot.la.isEmpty || spot.lo.isEmpty) {
+        continue;
+      }
+
+      try {
+        final double lat = double.parse(spot.la);
+        final double lng = double.parse(spot.lo);
+        final position = LatLng(lat, lng);
+
+        final marker = Marker(
+          markerId: MarkerId('nightspot_${spot.num}'),
+          position: position,
+          icon: _nightSpotMarkerIcon!,
+          onTap: () => _showNightSpotDetails(spot),
+        );
+
+        setState(() {
+          _markers.add(marker);
+        });
+        print('🌙 야경명소 마커 추가: ${spot.title} ($lat, $lng)');
+      } catch (e) {
+        print('⚠️ 야경명소 마커 생성 실패 (${spot.title}): $e');
+      }
+    }
+  }
+
+  /// 야경명소 상세 정보 바텀 시트 표시
+  void _showNightSpotDetails(NightSpot spot) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 드래그 핸들
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 카테고리 태그
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '🌙 ${spot.subjectCd}',
+                        style: TextStyle(
+                          color: Colors.blue[700],
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // 제목
+                    Text(
+                      spot.title,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // 주소
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            spot.addr,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (spot.telNo.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.phone, size: 16, color: Colors.grey[600]),
+                          const SizedBox(width: 4),
+                          Text(
+                            spot.telNo,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    // 운영시간
+                    if (spot.operatingTime.isNotEmpty) ...[
+                      _buildInfoRow('운영시간', spot.operatingTime),
+                      const SizedBox(height: 12),
+                    ],
+                    // 입장료
+                    if (spot.entrFee.isNotEmpty) ...[
+                      _buildInfoRow('입장료', spot.entrFee),
+                      const SizedBox(height: 12),
+                    ],
+                    // 교통편
+                    if (spot.subway.isNotEmpty) ...[
+                      _buildInfoRow('🚇 지하철', spot.subway),
+                      const SizedBox(height: 12),
+                    ],
+                    if (spot.bus.isNotEmpty) ...[
+                      _buildInfoRow('🚌 버스', spot.bus),
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 정보 행 위젯
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 14),
+          ),
+        ),
+      ],
+    );
   }
 
   /// 관광지 상세 정보 바텀 시트 표시

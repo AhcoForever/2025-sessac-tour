@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/recommendation.dart';
 
 class RecommendationCard extends StatelessWidget {
@@ -34,71 +35,138 @@ class RecommendationCard extends StatelessWidget {
         minChildSize: 0.4,
         maxChildSize: 0.9,
         expand: false,
-        builder: (context, scrollController) => Padding(
-          padding: const EdgeInsets.all(24),
-          child: ListView(
-            controller: scrollController,
-            children: [
-              // 핸들 바
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // 카테고리 태그
-              _CategoryTag(category: recommendation.category),
-              const SizedBox(height: 16),
-
-              // 제목
-              Text(
-                recommendation.title,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+        builder: (context, scrollController) => Column(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: ListView(
+                  controller: scrollController,
+                  children: [
+                    // 핸들 바
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                     ),
-              ),
-              const SizedBox(height: 16),
+                    const SizedBox(height: 20),
 
-              // 설명
-              Text(
-                recommendation.description,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: 24),
+                    // 카테고리 태그
+                    _CategoryTag(category: recommendation.category),
+                    const SizedBox(height: 16),
 
-              // 상세 정보
-              if (recommendation.distance != null)
-                _DetailRow(
-                  icon: Icons.location_on_outlined,
-                  label: '거리',
-                  value: recommendation.distance!,
+                    // 제목
+                    Text(
+                      recommendation.title,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 설명
+                    Text(
+                      recommendation.description,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 상세 정보
+                    if (recommendation.distance != null)
+                      _DetailRow(
+                        icon: Icons.location_on_outlined,
+                        label: '거리',
+                        value: recommendation.distance!,
+                      ),
+                    if (recommendation.duration != null)
+                      _DetailRow(
+                        icon: Icons.access_time,
+                        label: '소요 시간',
+                        value: recommendation.duration!,
+                      ),
+                    if (recommendation.cost != null)
+                      _DetailRow(
+                        icon: Icons.credit_card,
+                        label: '비용',
+                        value: recommendation.cost!, // 실제 비용 표시
+                      ),
+                    if (recommendation.rating != null)
+                      _DetailRow(
+                        icon: Icons.star,
+                        label: '평점',
+                        value: '${recommendation.rating} / 5.0',
+                      ),
+                  ],
                 ),
-              if (recommendation.duration != null)
-                _DetailRow(
-                  icon: Icons.access_time,
-                  label: '소요 시간',
-                  value: recommendation.duration!,
-                ),
-              if (recommendation.cost != null)
-                _DetailRow(
-                  icon: Icons.credit_card,
-                  label: '비용',
-                  value: recommendation.cost!, // 실제 비용 표시
-                ),
-              if (recommendation.rating != null)
-                _DetailRow(
-                  icon: Icons.star,
-                  label: '평점',
-                  value: '${recommendation.rating} / 5.0',
-                ),
-            ],
-          ),
+              ),
+            ),
+            // 하단 버튼들
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    offset: const Offset(0, -2),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  // 저장하기 버튼
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        // TODO: 저장하기 기능 구현
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.bookmark_border),
+                      label: const Text('저장하기'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 루틴 선택하기 버튼
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: () {
+                       context.goNamed("map");
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        '루틴 선택하기',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
