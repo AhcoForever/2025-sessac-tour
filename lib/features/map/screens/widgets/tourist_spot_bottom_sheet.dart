@@ -258,7 +258,7 @@ class TouristSpotBottomSheet extends StatelessWidget {
                       color: Colors.white,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 10,
                           offset: const Offset(0, -5),
                         ),
@@ -281,10 +281,8 @@ class TouristSpotBottomSheet extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.location_on, size: 20),
-                          const SizedBox(width: 8),
                           Text(
-                            '목적지로 설정하고 출발하기',
+                            '출발하기',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
