@@ -1,13 +1,14 @@
-# **서울(soul)이랑 놀러갈래? SOFE와 함께! — Design your Soulful Seoul Life, SOFE**
+# **서울(soul)이랑 놀러갈래? SOFE와 함께!**
+\- <b>Design your <span style="color:#C14D8A">So</span>ulful Seoul Li<span style="color:#C14D8A">fe</span>✨</b>
 ### **Who we are**
 2025 새싹 해커톤 참가를 위한 프로젝트 입니다.
 - 팀 명 : Sessac Tour (새싹투어)
-- 멤버 : 김민영(@AhcoForever), 김수현(@artishk52), 소아연(@ayeoniiii), 유승화(@9121awh)
+- 멤버 : 김민영([@AhcoForever](https://github.com/AhcoForever)), 김수현([@artishk52](https://github.com/artishk52)), 소아연([@ayeoniiii](https://github.com/ayeoniiii)), 유승화([@9121awh](https://github.com/9121awh))
 
 ## **SOFE**
 - 앱 이름 : SOFE(소프)
-- 슬로건 : DESIGN YOUR **SO**ULFUL SEOUL LI**FE**
-- 의미 : 당신의 하루에 말을 걸고, 서울이 함께 걷는 일상을 경험
+- 의미 : 당신의 하루에 말을 걸고, 서울이 함께 걷는 일상을 경험한다.
+    SOFE(소프)가 감정적으로 소통하고 서울프렌즈 AI와 함께 사용자에게 개인 맞춤형 정보를 제공해줍니다.
 - 캐릭터 세계관 : 서울시 공식 캐릭터 SoulFriends (소울프렌즈) - 댕댕청룡, 소울해치, 돌격백호가 "오늘은 어떤 하루를 보내고 싶어요?"하고 말을 건다.
 - 핵심 메시지 : 서울의 다양한 여가 데이터를 기반으로, 지친 청년의 하루를 다시 '움직이게' 만드는 감정형 여가 서비스.
 
