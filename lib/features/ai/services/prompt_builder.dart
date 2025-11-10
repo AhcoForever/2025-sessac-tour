@@ -2,6 +2,7 @@ import '../models/chracter.dart';
 import '../../public_data/models/cultural_event.dart';
 import '../../public_data/models/content_list_item.dart';
 import '../../public_data/models/park_info.dart';
+import '../../public_data/models/cultural_space.dart';
 
 /// AI 챗봇의 시스템 프롬프트를 생성하는 클래스
 ///
@@ -17,12 +18,14 @@ class PromptBuilder {
   /// [culturalEvents] 서울시 문화행사 데이터
   /// [tourContents] VisitSeoul 관광 콘텐츠 데이터
   /// [parkInfos] 서울시 주요 공원현황 데이터
+  /// [culturalSpaces] 서울시 문화 공간 데이터
   /// [currentLocation] 사용자 현재 위치 정보 (선택)
   static String buildSystemPrompt({
     Character? character,
     required List<CulturalEvent> culturalEvents,
     required List<ContentListItem> tourContents,
     required List<ParkInfo> parkInfos,
+    required List<CulturalSpace> culturalSpaces,
     String? currentLocation,
   }) {
     final commonRole = _getCommonRoleDefinition();
@@ -37,6 +40,7 @@ class PromptBuilder {
     final culturalEventsData = _formatCulturalEvents(culturalEvents);
     final tourContentsData = _formatTourContents(tourContents);
     final parkInfoData = _formatParkInfo(parkInfos);
+    final culturalSpaceData = _formatCulturalSpace(culturalSpaces);
 
     return '''
 $commonRole
@@ -68,6 +72,10 @@ $tourContentsData
 ---
 [서울시 주요 공원 정보]
 $parkInfoData
+
+---
+[서울시 문화 공간 정보]
+$culturalSpaceData
 ''';
   }
 
@@ -302,6 +310,7 @@ $parkInfoData
 - 서울시 문화행사 데이터
 - VisitSeoul 관광 콘텐츠 데이터
 - 서울시 주요 공원 데이터
+- 서울시 문화 공간 데이터 (도서관, 공연장, 문화예술회관 등)
 - 제공된 데이터 내에서만 추천
 - 데이터에 없으면 "정보가 없어서..."라고 솔직히 말하기
 
@@ -510,9 +519,59 @@ $currentLocation
     return buffer.toString();
   }
 
+  /// 문화 공간 정보 데이터 포맷팅
+  static String _formatCulturalSpace(List<CulturalSpace> spaces) {
+    if (spaces.isEmpty) {
+      return '현재 문화 공간 정보를 불러올 수 없습니다.';
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln('[총 ${spaces.length}개 문화 공간]');
+    buffer.writeln();
+
+    // 카테고리별 그룹화
+    final groupedSpaces = <String, List<CulturalSpace>>{};
+    for (var space in spaces) {
+      final category = space.subjectCode.isNotEmpty ? space.subjectCode : '기타';
+      groupedSpaces.putIfAbsent(category, () => []).add(space);
+    }
+
+    // 카테고리별로 출력
+    for (var entry in groupedSpaces.entries) {
+      buffer.writeln('## ${entry.key} (${entry.value.length}개)');
+
+      for (int i = 0; i < entry.value.length; i++) {
+        final space = entry.value[i];
+        buffer.writeln('${i + 1}. ${space.facilityName}');
+
+        buffer.writeln('   📍 위치: ${space.address} (${space.district})');
+
+        if (space.entranceFree != null && space.entranceFree!.isNotEmpty) {
+          buffer.writeln('   💰 ${space.entranceFree}');
+        }
+
+        if (space.closeDay != null && space.closeDay!.isNotEmpty) {
+          buffer.writeln('   🚫 휴무: ${space.closeDay}');
+        }
+
+        if (space.phone.isNotEmpty) {
+          buffer.writeln('   📞 전화: ${space.phone}');
+        }
+
+        if (space.homepage != null && space.homepage!.isNotEmpty) {
+          buffer.writeln('   🌐 홈페이지: ${space.homepage}');
+        }
+
+        buffer.writeln();
+      }
+    }
+
+    return buffer.toString();
+  }
+
   /// 프롬프트 버전 정보
-  static const String version = '1.1.0';
+  static const String version = '1.2.0';
 
   /// 프롬프트 마지막 업데이트 날짜
-  static const String lastUpdated = '2025-11-09';
+  static const String lastUpdated = '2025-11-10';
 }
