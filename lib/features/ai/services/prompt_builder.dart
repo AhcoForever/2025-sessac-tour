@@ -1,6 +1,7 @@
 import '../models/chracter.dart';
 import '../../public_data/models/cultural_event.dart';
 import '../../public_data/models/content_list_item.dart';
+import '../../public_data/models/park_info.dart';
 
 /// AI 챗봇의 시스템 프롬프트를 생성하는 클래스
 ///
@@ -15,11 +16,13 @@ class PromptBuilder {
   /// [character] 선택된 캐릭터 (null일 경우 기본 프롬프트)
   /// [culturalEvents] 서울시 문화행사 데이터
   /// [tourContents] VisitSeoul 관광 콘텐츠 데이터
+  /// [parkInfos] 서울시 주요 공원현황 데이터
   /// [currentLocation] 사용자 현재 위치 정보 (선택)
   static String buildSystemPrompt({
     Character? character,
     required List<CulturalEvent> culturalEvents,
     required List<ContentListItem> tourContents,
+    required List<ParkInfo> parkInfos,
     String? currentLocation,
   }) {
     final commonRole = _getCommonRoleDefinition();
@@ -33,6 +36,7 @@ class PromptBuilder {
     final timeInfo = _getTimeInfo();
     final culturalEventsData = _formatCulturalEvents(culturalEvents);
     final tourContentsData = _formatTourContents(tourContents);
+    final parkInfoData = _formatParkInfo(parkInfos);
 
     return '''
 $commonRole
@@ -60,6 +64,10 @@ $culturalEventsData
 ---
 [서울 관광 콘텐츠 정보]
 $tourContentsData
+
+---
+[서울시 주요 공원 정보]
+$parkInfoData
 ''';
   }
 
@@ -293,6 +301,7 @@ $tourContentsData
 1. RAG 데이터 참고:
 - 서울시 문화행사 데이터
 - VisitSeoul 관광 콘텐츠 데이터
+- 서울시 주요 공원 데이터
 - 제공된 데이터 내에서만 추천
 - 데이터에 없으면 "정보가 없어서..."라고 솔직히 말하기
 
@@ -443,9 +452,67 @@ $currentLocation
     return buffer.toString();
   }
 
+  /// 공원 정보 데이터 포맷팅
+  static String _formatParkInfo(List<ParkInfo> parks) {
+    if (parks.isEmpty) {
+      return '현재 공원 정보를 불러올 수 없습니다.';
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln('[총 ${parks.length}개 공원]');
+    buffer.writeln();
+
+    // 지역별 그룹화
+    final groupedParks = <String, List<ParkInfo>>{};
+    for (var park in parks) {
+      final region = park.region.isNotEmpty ? park.region : '기타';
+      groupedParks.putIfAbsent(region, () => []).add(park);
+    }
+
+    // 지역별로 출력
+    for (var entry in groupedParks.entries) {
+      buffer.writeln('## ${entry.key} (${entry.value.length}개)');
+
+      for (int i = 0; i < entry.value.length; i++) {
+        final park = entry.value[i];
+        buffer.writeln('${i + 1}. ${park.parkName}');
+
+        if (park.parkOutline.isNotEmpty) {
+          // 개요가 너무 길면 처음 100자만 사용
+          final outline = park.parkOutline.length > 100
+              ? '${park.parkOutline.substring(0, 100)}...'
+              : park.parkOutline;
+          buffer.writeln('   📝 개요: $outline');
+        }
+
+        buffer.writeln('   📍 위치: ${park.parkAddress}');
+
+        if (park.area.isNotEmpty) {
+          buffer.writeln('   📏 면적: ${park.area}');
+        }
+
+        if (park.mainFacility.isNotEmpty) {
+          // 주요시설이 너무 길면 처음 80자만 사용
+          final facilities = park.mainFacility.length > 80
+              ? '${park.mainFacility.substring(0, 80)}...'
+              : park.mainFacility;
+          buffer.writeln('   🏢 주요시설: $facilities');
+        }
+
+        if (park.telNo.isNotEmpty) {
+          buffer.writeln('   📞 전화: ${park.telNo}');
+        }
+
+        buffer.writeln();
+      }
+    }
+
+    return buffer.toString();
+  }
+
   /// 프롬프트 버전 정보
-  static const String version = '1.0.0';
+  static const String version = '1.1.0';
 
   /// 프롬프트 마지막 업데이트 날짜
-  static const String lastUpdated = '2025-11-06';
+  static const String lastUpdated = '2025-11-09';
 }

@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 
 import '../models/cultural_event.dart';
 import '../models/night_spot.dart';
+import '../models/park_info.dart';
+import '../models/cultural_space.dart';
 
 class SeoulApiService {
   // API 키 입력 :  서울데이터광장
@@ -102,6 +104,99 @@ class SeoulApiService {
       }
     } catch (e, stackTrace) {
       print('❌ 야경명소 API 호출 오류: $e');
+      print('❌ 스택 트레이스: $stackTrace');
+      return null;
+    }
+  }
+
+  // 서울시 주요 공원현황 정보 가져오기
+  Future<ParkInfoResponse?> getParkInfo({
+    int startIndex = 1,
+    int endIndex = 50,
+  }) async {
+    final url =
+        '$_baseUrl/$_apiKey/json/SearchParkInfoService/$startIndex/$endIndex/';
+
+    print('🌳 공원 정보 API 호출 시작');
+    print('🔗 요청 URL: $url');
+
+    try {
+      final response = await http.get(Uri.parse(url));
+
+      print('📥 응답 상태 코드: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+
+        // 데이터 존재 여부 확인
+        if (jsonData['SearchParkInfoService'] != null) {
+          final parkInfoResponse = ParkInfoResponse.fromJson(jsonData);
+
+          if (parkInfoResponse.result.isSuccess) {
+            print('✅ 공원 정보 ${parkInfoResponse.row.length}개 로드 성공');
+            return parkInfoResponse;
+          } else {
+            print('⚠️ API 결과 코드: ${parkInfoResponse.result.code}');
+            print('⚠️ 메시지: ${parkInfoResponse.result.message}');
+            return null;
+          }
+        } else {
+          print('⚠️ SearchParkInfoService 데이터가 null입니다.');
+          return null;
+        }
+      } else {
+        print('❌ HTTP 에러: ${response.statusCode}');
+        return null;
+      }
+    } catch (e, stackTrace) {
+      print('❌ 공원 정보 API 호출 오류: $e');
+      print('❌ 스택 트레이스: $stackTrace');
+      return null;
+    }
+  }
+
+  // 서울시 문화 공간 정보 가져오기
+  Future<CulturalSpaceResponse?> getCulturalSpace({
+    int startIndex = 1,
+    int endIndex = 50,
+  }) async {
+    final url =
+        '$_baseUrl/$_apiKey/json/culturalSpaceInfo/$startIndex/$endIndex/';
+
+    print('🎭 문화 공간 정보 API 호출 시작');
+    print('🔗 요청 URL: $url');
+
+    try {
+      final response = await http.get(Uri.parse(url));
+
+      print('📥 응답 상태 코드: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+
+        // 데이터 존재 여부 확인
+        if (jsonData['culturalSpaceInfo'] != null) {
+          final culturalSpaceResponse =
+              CulturalSpaceResponse.fromJson(jsonData);
+
+          if (culturalSpaceResponse.result.isSuccess) {
+            print('✅ 문화 공간 정보 ${culturalSpaceResponse.row.length}개 로드 성공');
+            return culturalSpaceResponse;
+          } else {
+            print('⚠️ API 결과 코드: ${culturalSpaceResponse.result.code}');
+            print('⚠️ 메시지: ${culturalSpaceResponse.result.message}');
+            return null;
+          }
+        } else {
+          print('⚠️ culturalSpaceInfo 데이터가 null입니다.');
+          return null;
+        }
+      } else {
+        print('❌ HTTP 에러: ${response.statusCode}');
+        return null;
+      }
+    } catch (e, stackTrace) {
+      print('❌ 문화 공간 정보 API 호출 오류: $e');
       print('❌ 스택 트레이스: $stackTrace');
       return null;
     }
