@@ -31,10 +31,10 @@ final GoRouter appRouter = GoRouter(
       path: '/',
       name: 'landing',
       builder: (context, state) =>
-          MapPage(),
+          //MapPage(),
       //ContentListPage()
       //CulturalEventsPage()
-     // LandingPage(),
+      LandingPage(),
     ),
     GoRoute(
       path: '/login',

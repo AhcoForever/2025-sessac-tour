@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../../core/config.dart';
 import '../../public_data/models/cultural_event.dart';
 import '../../public_data/models/content_list_item.dart';
+import '../../public_data/models/park_info.dart';
 import '../../public_data/services/seoulapi_service.dart';
 import '../../public_data/services/visitseoul_api_service.dart';
 import '../../map/services/location_service.dart';
@@ -37,6 +38,7 @@ class _AiChatPageState extends State<AiChatPage> {
   bool _isLoadingData = true; // 데이터 로딩 중
   List<CulturalEvent> _culturalEvents = [];
   List<ContentListItem> _tourContents = [];
+  List<ParkInfo> _parkInfos = [];
   Character? _selectedCharacter; // 선택된 캐릭터
   String? _selectedCategory; // 선택된 카테고리
   Position? _currentPosition; // 현재 위치
@@ -82,6 +84,7 @@ class _AiChatPageState extends State<AiChatPage> {
       character: _selectedCharacter,
       culturalEvents: _culturalEvents,
       tourContents: _tourContents,
+      parkInfos: _parkInfos,
       currentLocation: _currentLocation,
     );
   }
@@ -102,6 +105,8 @@ class _AiChatPageState extends State<AiChatPage> {
     _loadCulturalEvents();
     // VisitSeoul 관광 콘텐츠 데이터 로드
     _loadTourContents();
+    // 서울시 공원 정보 데이터 로드
+    _loadParkInfo();
     // 위치 정보 로드
     _loadLocation();
   }
@@ -211,6 +216,30 @@ class _AiChatPageState extends State<AiChatPage> {
       print('❌ 관광 콘텐츠 로드 실패: $e');
       setState(() {
         _tourContents = [];
+      });
+    }
+  }
+
+  /// 서울시 공원 정보 데이터 로드 (RAG)
+  Future<void> _loadParkInfo() async {
+    try {
+      // 서울시 공원 정보 50개 가져오기
+      final response = await _seoulApiService.getParkInfo(
+        startIndex: 1,
+        endIndex: 50,
+      );
+
+      if (response != null && response.result.isSuccess) {
+        setState(() {
+          _parkInfos = response.row;
+        });
+
+        print('✅ 공원 정보 ${response.row.length}개 로드 완료');
+      }
+    } catch (e) {
+      print('❌ 공원 정보 로드 실패: $e');
+      setState(() {
+        _parkInfos = [];
       });
     }
   }

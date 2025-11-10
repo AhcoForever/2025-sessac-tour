@@ -1,5 +1,5 @@
 # **서울(soul)이랑 놀러갈래? SOFE와 함께!**
-\- <b>Design your <span style="color:#C14D8A">So</span>ulful Seoul Li<span style="color:#C14D8A">fe</span>✨</b>
+\- *Design your soulful Seoul Life*
 
 soulful: 감정이 풍부한, 혼이 담긴(듯한)
 ### **Who we are**
