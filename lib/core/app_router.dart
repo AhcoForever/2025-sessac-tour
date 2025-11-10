@@ -2,12 +2,14 @@ import 'package:go_router/go_router.dart';
 import 'package:sessactour/core/landing_page.dart';
 import 'package:sessactour/features/ai/screens/ai_chat_page.dart';
 import 'package:sessactour/features/ai/screens/character_select_page.dart';
+import 'package:sessactour/features/ai/screens/chat_profile_edit_page.dart';
 import 'package:sessactour/features/ai/screens/routine_recommendation_page.dart';
 import 'package:sessactour/features/auth/screens/account_deletion_page.dart';
 import 'package:sessactour/features/auth/screens/forgot_password_page.dart';
 import 'package:sessactour/features/auth/screens/login_page.dart';
 import 'package:sessactour/features/auth/screens/logout_page.dart';
 import 'package:sessactour/features/auth/screens/signup_page.dart';
+import 'package:sessactour/features/auth/screens/user_profile_page.dart';
 import 'package:sessactour/features/camera/screens/photo_capture_page.dart';
 import 'package:sessactour/features/map/screens/map_page.dart';
 import 'package:sessactour/features/public_data/screens/content_detail_page.dart';
@@ -30,11 +32,12 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/',
       name: 'landing',
-      builder: (context, state) =>
+      builder: (context, state) =>UserProfilePage()
+      // ChatProfileEditPage()
           //MapPage(),
       //ContentListPage()
       //CulturalEventsPage()
-      LandingPage(),
+      //LandingPage(),
     ),
     GoRoute(
       path: '/login',
@@ -94,6 +97,16 @@ final GoRouter appRouter = GoRouter(
       path: '/routine-recommendation',
       name: 'routine-recommendation',
       builder: (context, state) => RoutineRecommendationPage(),
+    ),
+    GoRoute(
+      path: '/chat-profile-edit',
+      name: 'chat-profile-edit',
+      builder: (context, state) => ChatProfileEditPage(),
+    ),
+    GoRoute(
+      path: '/user-profile',
+      name: 'user-profile',
+      builder: (context, state) => UserProfilePage(),
     ),
 
     // GoRoute(
