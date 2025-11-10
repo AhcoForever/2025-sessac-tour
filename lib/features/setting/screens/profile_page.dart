@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import '../../camera/screens/photo_gallery_page.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -116,6 +117,15 @@ class ProfilePage extends StatelessWidget {
               context,
               title: '설정',
               items: [
+                _MenuItem(
+                  icon: Icons.psychology,
+                  iconColor: Colors.blue,
+                  title: 'AI 채팅 선호도',
+                  subtitle: '활동 수준, 예산, 관심사 설정',
+                  onTap: () {
+                    context.push('/chat-profile-edit');
+                  },
+                ),
                 _MenuItem(
                   icon: Icons.person,
                   iconColor: Colors.orange,

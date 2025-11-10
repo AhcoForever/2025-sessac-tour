@@ -16,6 +16,7 @@ import '../models/recommendation.dart';
 import '../services/claude_service.dart';
 import '../services/character_storage_service.dart';
 import '../services/prompt_builder.dart';
+import '../services/chat_profile_service.dart';
 import 'widgets/message_bubble.dart';
 
 class AiChatPage extends StatefulWidget {
@@ -34,6 +35,7 @@ class _AiChatPageState extends State<AiChatPage> {
   final SeoulApiService _seoulApiService = SeoulApiService();
   final VisitSeoulApiService _visitSeoulApiService = VisitSeoulApiService();
   final LocationService _locationService = LocationService();
+  final ChatProfileService _chatProfileService = ChatProfileService();
 
   bool _isLoading = false;
   bool _isLoadingData = true; // 데이터 로딩 중
@@ -280,7 +282,7 @@ class _AiChatPageState extends State<AiChatPage> {
     super.dispose();
   }
 
-  /// 메시지 전송
+  /// 메시지 전송 (SSE 스트리밍 방식)
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty || _isLoading) return;
@@ -295,34 +297,54 @@ class _AiChatPageState extends State<AiChatPage> {
     _messageController.clear();
     _scrollToBottom();
 
+    // 빈 Assistant 메시지를 먼저 추가 (스트리밍으로 채워질 예정)
+    final assistantMessage = ChatMessage.assistant('');
+    setState(() {
+      _messages.add(assistantMessage);
+    });
+
+    String accumulatedText = '';
+
     try {
-      // Claude API 호출 (시스템 프롬프트 포함)
-      final response = await _claudeService.sendMessage(
-        messages: _messages,
+      // Claude API 스트리밍 호출
+      final stream = _claudeService.sendMessageStream(
+        messages: _messages.where((msg) => msg != assistantMessage).toList(),
         systemPrompt: _systemPrompt,
         maxTokens: 2048,
       );
 
-      // 응답 파싱 (텍스트 + 추천 데이터)
-      final (textPart, recommendations) = _parseResponse(response);
+      await for (var chunk in stream) {
+        accumulatedText += chunk;
 
-      // Assistant 응답 추가
-      final assistantMessage = ChatMessage.assistant(
-        textPart,
-        recommendations: recommendations,
-      );
+        // 실시간으로 텍스트 업데이트
+        setState(() {
+          _messages[_messages.length - 1] = ChatMessage.assistant(accumulatedText);
+        });
+        _scrollToBottom();
+      }
+
+      // 스트리밍 완료 후 추천 데이터 파싱
+      final (textPart, recommendations) = _parseResponse(accumulatedText);
+
+      // 최종 메시지 업데이트 (추천 데이터 포함)
       setState(() {
-        _messages.add(assistantMessage);
+        _messages[_messages.length - 1] = ChatMessage.assistant(
+          textPart,
+          recommendations: recommendations,
+        );
         _isLoading = false;
       });
+
+      // 채팅 프로필 업데이트
+      await _updateChatProfile(recommendations);
 
       _scrollToBottom();
     } catch (e) {
       // 오류 처리
       setState(() {
-        _messages.add(ChatMessage.assistant(
+        _messages[_messages.length - 1] = ChatMessage.assistant(
           '죄송합니다. 오류가 발생했습니다: ${e.toString()}',
-        ));
+        );
         _isLoading = false;
       });
       _scrollToBottom();
@@ -384,6 +406,38 @@ class _AiChatPageState extends State<AiChatPage> {
       print('JSON: $jsonPart');
       // 파싱 실패 시 원본 응답 반환
       return (response, null);
+    }
+  }
+
+  /// 채팅 프로필 업데이트
+  Future<void> _updateChatProfile(List<Recommendation>? recommendations) async {
+    try {
+      // 1. 대화 횟수 증가
+      await _chatProfileService.incrementChatCount();
+
+      // 2. 캐릭터 정보 저장
+      if (_selectedCharacter != null) {
+        await _chatProfileService.updateCharacter(_selectedCharacter!.id);
+      }
+
+      // 3. 추천이 있으면 저장
+      if (recommendations != null && recommendations.isNotEmpty) {
+        for (final rec in recommendations) {
+          await _chatProfileService.addRecommendation(
+            title: rec.title,
+            category: rec.category,
+            description: rec.description,
+          );
+
+          // 카테고리를 선호 카테고리로 추가
+          await _chatProfileService.addFavoriteCategory(rec.category);
+        }
+      }
+
+      print('✅ 채팅 프로필 업데이트 완료');
+    } catch (e) {
+      print('❌ 채팅 프로필 업데이트 실패: $e');
+      // 프로필 저장 실패는 사용자 경험에 영향을 주지 않도록 무시
     }
   }
 
@@ -452,7 +506,7 @@ class _AiChatPageState extends State<AiChatPage> {
     );
   }
 
-  /// 예시 질문 전송
+  /// 예시 질문 전송 (SSE 스트리밍 방식)
   Future<void> _sendExampleQuestion(String question) async {
     if (_isLoading) return;
 
@@ -466,34 +520,54 @@ class _AiChatPageState extends State<AiChatPage> {
 
     _scrollToBottom();
 
+    // 빈 Assistant 메시지를 먼저 추가 (스트리밍으로 채워질 예정)
+    final assistantMessage = ChatMessage.assistant('');
+    setState(() {
+      _messages.add(assistantMessage);
+    });
+
+    String accumulatedText = '';
+
     try {
-      // Claude API 호출
-      final response = await _claudeService.sendMessage(
-        messages: _messages,
+      // Claude API 스트리밍 호출
+      final stream = _claudeService.sendMessageStream(
+        messages: _messages.where((msg) => msg != assistantMessage).toList(),
         systemPrompt: _systemPrompt,
         maxTokens: 2048,
       );
 
-      // 응답 파싱 (텍스트 + 추천 데이터)
-      final (textPart, recommendations) = _parseResponse(response);
+      await for (var chunk in stream) {
+        accumulatedText += chunk;
 
-      // Assistant 응답 추가
-      final assistantMessage = ChatMessage.assistant(
-        textPart,
-        recommendations: recommendations,
-      );
+        // 실시간으로 텍스트 업데이트
+        setState(() {
+          _messages[_messages.length - 1] = ChatMessage.assistant(accumulatedText);
+        });
+        _scrollToBottom();
+      }
+
+      // 스트리밍 완료 후 추천 데이터 파싱
+      final (textPart, recommendations) = _parseResponse(accumulatedText);
+
+      // 최종 메시지 업데이트 (추천 데이터 포함)
       setState(() {
-        _messages.add(assistantMessage);
+        _messages[_messages.length - 1] = ChatMessage.assistant(
+          textPart,
+          recommendations: recommendations,
+        );
         _isLoading = false;
       });
+
+      // 채팅 프로필 업데이트
+      await _updateChatProfile(recommendations);
 
       _scrollToBottom();
     } catch (e) {
       // 오류 처리
       setState(() {
-        _messages.add(ChatMessage.assistant(
+        _messages[_messages.length - 1] = ChatMessage.assistant(
           '죄송합니다. 오류가 발생했습니다: ${e.toString()}',
-        ));
+        );
         _isLoading = false;
       });
       _scrollToBottom();
