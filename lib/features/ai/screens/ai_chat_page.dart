@@ -6,6 +6,7 @@ import '../../../core/config.dart';
 import '../../public_data/models/cultural_event.dart';
 import '../../public_data/models/content_list_item.dart';
 import '../../public_data/models/park_info.dart';
+import '../../public_data/models/cultural_space.dart';
 import '../../public_data/services/seoulapi_service.dart';
 import '../../public_data/services/visitseoul_api_service.dart';
 import '../../map/services/location_service.dart';
@@ -39,6 +40,7 @@ class _AiChatPageState extends State<AiChatPage> {
   List<CulturalEvent> _culturalEvents = [];
   List<ContentListItem> _tourContents = [];
   List<ParkInfo> _parkInfos = [];
+  List<CulturalSpace> _culturalSpaces = [];
   Character? _selectedCharacter; // 선택된 캐릭터
   String? _selectedCategory; // 선택된 카테고리
   Position? _currentPosition; // 현재 위치
@@ -85,6 +87,7 @@ class _AiChatPageState extends State<AiChatPage> {
       culturalEvents: _culturalEvents,
       tourContents: _tourContents,
       parkInfos: _parkInfos,
+      culturalSpaces: _culturalSpaces,
       currentLocation: _currentLocation,
     );
   }
@@ -107,6 +110,8 @@ class _AiChatPageState extends State<AiChatPage> {
     _loadTourContents();
     // 서울시 공원 정보 데이터 로드
     _loadParkInfo();
+    // 서울시 문화 공간 정보 데이터 로드
+    _loadCulturalSpace();
     // 위치 정보 로드
     _loadLocation();
   }
@@ -168,10 +173,10 @@ class _AiChatPageState extends State<AiChatPage> {
     });
 
     try {
-      // 서울시 문화행사 20개 가져오기
+      // 서울시 문화행사 100개 가져오기
       final events = await _seoulApiService.getCulturalEvent(
         startIndex: 1,
-        endIndex: 20,
+        endIndex: 100,
       );
 
       setState(() {
@@ -192,7 +197,7 @@ class _AiChatPageState extends State<AiChatPage> {
   /// VisitSeoul 관광 콘텐츠 데이터 로드 (RAG)
   Future<void> _loadTourContents() async {
     try {
-      // VisitSeoul 관광 콘텐츠 20개 가져오기 (한국어)
+      // VisitSeoul 관광 콘텐츠 100개 가져오기 (한국어)
       final response = await _visitSeoulApiService.getContentList(
         langCodeId: 'ko',
         sortType: 'latest',
@@ -203,7 +208,7 @@ class _AiChatPageState extends State<AiChatPage> {
         // 진행 중인 콘텐츠만 필터링
         final ongoingContents = response.data
             .where((content) => content.isOngoing())
-            .take(20)
+            .take(100)
             .toList();
 
         setState(() {
@@ -240,6 +245,30 @@ class _AiChatPageState extends State<AiChatPage> {
       print('❌ 공원 정보 로드 실패: $e');
       setState(() {
         _parkInfos = [];
+      });
+    }
+  }
+
+  /// 서울시 문화 공간 정보 데이터 로드 (RAG)
+  Future<void> _loadCulturalSpace() async {
+    try {
+      // 서울시 문화 공간 정보 50개 가져오기
+      final response = await _seoulApiService.getCulturalSpace(
+        startIndex: 1,
+        endIndex: 50,
+      );
+
+      if (response != null && response.result.isSuccess) {
+        setState(() {
+          _culturalSpaces = response.row;
+        });
+
+        print('✅ 문화 공간 정보 ${response.row.length}개 로드 완료');
+      }
+    } catch (e) {
+      print('❌ 문화 공간 정보 로드 실패: $e');
+      setState(() {
+        _culturalSpaces = [];
       });
     }
   }
