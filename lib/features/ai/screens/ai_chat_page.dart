@@ -9,6 +9,7 @@ import '../../public_data/models/park_info.dart';
 import '../../public_data/models/cultural_space.dart';
 import '../../public_data/services/seoulapi_service.dart';
 import '../../public_data/services/visitseoul_api_service.dart';
+import '../../public_data/services/weather_api_service.dart';
 import '../../map/services/location_service.dart';
 import '../models/chat_message.dart';
 import '../models/chracter.dart';
@@ -34,6 +35,7 @@ class _AiChatPageState extends State<AiChatPage> {
   late ClaudeService _claudeService;
   final SeoulApiService _seoulApiService = SeoulApiService();
   final VisitSeoulApiService _visitSeoulApiService = VisitSeoulApiService();
+  final WeatherApiService _weatherApiService = WeatherApiService();
   final LocationService _locationService = LocationService();
   final ChatProfileService _chatProfileService = ChatProfileService();
 
@@ -43,6 +45,7 @@ class _AiChatPageState extends State<AiChatPage> {
   List<ContentListItem> _tourContents = [];
   List<ParkInfo> _parkInfos = [];
   List<CulturalSpace> _culturalSpaces = [];
+  String? _weatherSummary; // 날씨 예보 요약
   Character? _selectedCharacter; // 선택된 캐릭터
   String? _selectedCategory; // 선택된 카테고리
   Position? _currentPosition; // 현재 위치
@@ -91,6 +94,7 @@ class _AiChatPageState extends State<AiChatPage> {
       parkInfos: _parkInfos,
       culturalSpaces: _culturalSpaces,
       currentLocation: _currentLocation,
+      weatherSummary: _weatherSummary,
     );
   }
 
@@ -116,6 +120,8 @@ class _AiChatPageState extends State<AiChatPage> {
     _loadCulturalSpace();
     // 위치 정보 로드
     _loadLocation();
+    // 날씨 예보 정보 로드
+    _loadWeather();
   }
 
   /// 위치 정보 로드
@@ -271,6 +277,25 @@ class _AiChatPageState extends State<AiChatPage> {
       print('❌ 문화 공간 정보 로드 실패: $e');
       setState(() {
         _culturalSpaces = [];
+      });
+    }
+  }
+
+  /// 기상청 중기예보 정보 로드 (RAG)
+  Future<void> _loadWeather() async {
+    try {
+      // 기상청 중기예보 조회
+      final summary = await _weatherApiService.getWeatherSummary();
+
+      setState(() {
+        _weatherSummary = summary;
+      });
+
+      print('✅ 날씨 예보 로드 완료');
+    } catch (e) {
+      print('❌ 날씨 예보 로드 실패: $e');
+      setState(() {
+        _weatherSummary = null;
       });
     }
   }

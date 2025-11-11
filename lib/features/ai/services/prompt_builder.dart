@@ -20,6 +20,7 @@ class PromptBuilder {
   /// [parkInfos] 서울시 주요 공원현황 데이터
   /// [culturalSpaces] 서울시 문화 공간 데이터
   /// [currentLocation] 사용자 현재 위치 정보 (선택)
+  /// [weatherSummary] 기상청 중기예보 정보 (선택)
   static String buildSystemPrompt({
     Character? character,
     required List<CulturalEvent> culturalEvents,
@@ -27,6 +28,7 @@ class PromptBuilder {
     required List<ParkInfo> parkInfos,
     required List<CulturalSpace> culturalSpaces,
     String? currentLocation,
+    String? weatherSummary,
   }) {
     final commonRole = _getCommonRoleDefinition();
     final characterPrompt = _getCharacterPrompt(character);
@@ -37,6 +39,7 @@ class PromptBuilder {
     final dataUsageRules = _getDataUsageRules();
     final locationInfo = _getLocationInfo(currentLocation);
     final timeInfo = _getTimeInfo();
+    final weatherInfo = _getWeatherInfo(weatherSummary);
     final culturalEventsData = _formatCulturalEvents(culturalEvents);
     final tourContentsData = _formatTourContents(tourContents);
     final parkInfoData = _formatParkInfo(parkInfos);
@@ -60,6 +63,8 @@ $dataUsageRules
 $timeInfo
 
 $locationInfo
+
+$weatherInfo
 
 ---
 [서울시 현재 진행 중인 문화 행사 정보]
@@ -374,6 +379,25 @@ $culturalSpaceData
 $currentLocation
 
 ⚠️ 위 위치 정보를 참고하여 가까운 장소를 우선 추천하세요. 사용자에게 "현재 위치 근처"라는 표현을 자연스럽게 사용하세요.''';
+    } else {
+      return '';
+    }
+  }
+
+  /// 날씨 정보 프롬프트
+  static String _getWeatherInfo(String? weatherSummary) {
+    if (weatherSummary != null && weatherSummary.isNotEmpty) {
+      return '''
+---
+[서울 날씨 예보 (3~10일 중기예보)]
+$weatherSummary
+
+⚠️ 날씨 정보 활용 규칙:
+1. 사용자가 "이번 주말", "다음주", "며칠 후" 같은 날짜를 언급하면 위 예보를 참고하세요.
+2. 비/눈 예보가 있으면 실내 활동 또는 우천 대비 장소를 추천하세요.
+3. 날씨가 좋으면 야외 활동, 한강, 공원 등을 추천하세요.
+4. 사용자가 날씨를 먼저 언급하지 않는 한, 날씨를 굳이 먼저 언급하지 마세요.
+5. 자연스럽게 날씨에 맞는 추천만 제공하면 됩니다.''';
     } else {
       return '';
     }
