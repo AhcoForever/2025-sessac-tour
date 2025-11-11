@@ -53,6 +53,15 @@ class ClaudeService {
       if (response.statusCode == 200) {
         final responseData = jsonDecode(utf8.decode(response.bodyBytes));
 
+        // 토큰 사용량 로깅 (디버그용)
+        if (responseData['usage'] != null) {
+          final usage = responseData['usage'];
+          print('📊 Token Usage:');
+          print('  - Input tokens: ${usage['input_tokens']}');
+          print('  - Output tokens: ${usage['output_tokens']}');
+          print('  - Total: ${(usage['input_tokens'] ?? 0) + (usage['output_tokens'] ?? 0)}');
+        }
+
         // Claude API 응답 형식: content는 배열이며, 텍스트는 첫 번째 요소에 있습니다
         if (responseData['content'] != null &&
             responseData['content'].isNotEmpty) {
