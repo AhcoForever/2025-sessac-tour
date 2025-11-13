@@ -9,6 +9,13 @@ import '../../camera/services/photo_memory_service.dart';
 import '../../camera/screens/photo_detail_page.dart';
 import '../../ai/models/user_chat_profile.dart';
 import '../../ai/services/chat_profile_service.dart';
+import '../../../core/utils/ui_helpers.dart';
+import '../../../core/widgets/stat_item_widget.dart';
+import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/loading_widget.dart';
+import '../../../core/widgets/stat_card_widget.dart';
+import '../widgets/photo_card_widget.dart';
+import '../widgets/recommendation_card_widget.dart';
 
 /// 사용자 프로필 페이지 (TabBar)
 class UserProfilePage extends StatefulWidget {
@@ -21,9 +28,6 @@ class UserProfilePage extends StatefulWidget {
 class _UserProfilePageState extends State<UserProfilePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -140,54 +144,26 @@ class _ProfileEditTabState extends State<_ProfileEditTab> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ 프로필 사진이 변경되었습니다'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        UiHelpers.showSuccessSnackBar(
+            context, '✅ 프로필 사진이 변경되었습니다');
       }
     } catch (e) {
       setState(() => _isUpdating = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ 오류: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        UiHelpers.showErrorSnackBar(context, '❌ 오류: $e');
       }
     }
   }
 
   /// 닉네임 변경
   Future<void> _changeDisplayName() async {
-    final controller = TextEditingController(text: _displayName);
-
-    final newName = await showDialog<String>(
+    final newName = await UiHelpers.showTextInputDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('닉네임 변경'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: '새 닉네임',
-            border: OutlineInputBorder(),
-          ),
-          maxLength: 20,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('변경'),
-          ),
-        ],
-      ),
+      title: '닉네임 변경',
+      label: '새 닉네임',
+      initialValue: _displayName,
+      maxLength: 20,
+      confirmText: '변경',
     );
 
     if (newName == null || newName.isEmpty) return;
@@ -213,22 +189,12 @@ class _ProfileEditTabState extends State<_ProfileEditTab> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ 닉네임이 변경되었습니다'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        UiHelpers.showSuccessSnackBar(context, '✅ 닉네임이 변경되었습니다');
       }
     } catch (e) {
       setState(() => _isUpdating = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ 오류: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        UiHelpers.showErrorSnackBar(context, '❌ 오류: $e');
       }
     }
   }
@@ -423,27 +389,12 @@ class _PhotoGalleryTabState extends State<_PhotoGalleryTab>
 
   /// 사진 삭제
   Future<void> _deletePhoto(PhotoMemory memory) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await UiHelpers.showConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('사진 삭제'),
-        content: Text('${memory.destinationName}의 인증샷을\n삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red[700],
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
+      title: '사진 삭제',
+      content: '${memory.destinationName}의 인증샷을\n삭제하시겠습니까?',
+      confirmText: '삭제',
+      confirmColor: Colors.red[700],
     );
 
     if (confirmed != true) return;
@@ -455,20 +406,10 @@ class _PhotoGalleryTabState extends State<_PhotoGalleryTab>
 
     if (mounted) {
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('사진이 삭제되었습니다.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        UiHelpers.showSuccessSnackBar(context, '사진이 삭제되었습니다.');
         _loadPhotoMemories();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('사진 삭제에 실패했습니다.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        UiHelpers.showErrorSnackBar(context, '사진 삭제에 실패했습니다.');
       }
     }
   }
@@ -478,101 +419,48 @@ class _PhotoGalleryTabState extends State<_PhotoGalleryTab>
     super.build(context);
 
     if (_isLoading) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('사진을 불러오는 중...'),
-          ],
-        ),
-      );
+      return const LoadingWidget(message: '사진을 불러오는 중...');
     }
 
     if (_errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(_errorMessage!),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadPhotoMemories,
-              child: const Text('다시 시도'),
-            ),
-          ],
+      return EmptyStateWidget(
+        icon: Icons.error_outline,
+        title: _errorMessage!,
+        action: ElevatedButton(
+          onPressed: _loadPhotoMemories,
+          child: const Text('다시 시도'),
         ),
       );
     }
 
     if (_photoMemories.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.photo_library, size: 80, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              '아직 촬영한 인증샷이 없어요',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '관광지에 도착해서 인증샷을 남겨보세요!',
-              style: TextStyle(color: Colors.grey[500]),
-            ),
-          ],
-        ),
+      return const EmptyStateWidget(
+        icon: Icons.photo_library,
+        title: '아직 촬영한 인증샷이 없어요',
+        subtitle: '관광지에 도착해서 인증샷을 남겨보세요!',
       );
     }
 
     return Column(
       children: [
         // 통계 카드
-        Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue[700]!, Colors.blue[500]!],
+        StatCardWidget(
+          gradient: LinearGradient(
+            colors: [Colors.blue[700]!, Colors.blue[500]!],
+          ),
+          children: [
+            StatItemWidget(
+              icon: Icons.photo_camera,
+              label: '총 인증샷',
+              value: '${_photoMemories.length}',
             ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.blue.withOpacity(0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem(
-                icon: Icons.photo_camera,
-                label: '총 인증샷',
-                value: '${_photoMemories.length}',
-              ),
-              Container(
-                width: 1,
-                height: 40,
-                color: Colors.white.withOpacity(0.3),
-              ),
-              _buildStatItem(
-                icon: Icons.location_on,
-                label: '방문한 곳',
-                value:
-                    '${_photoMemories.map((m) => m.destinationId).toSet().length}',
-              ),
-            ],
-          ),
+            StatItemWidget(
+              icon: Icons.location_on,
+              label: '방문한 곳',
+              value:
+                  '${_photoMemories.map((m) => m.destinationId).toSet().length}',
+            ),
+          ],
         ),
 
         // 사진 그리드
@@ -588,162 +476,25 @@ class _PhotoGalleryTabState extends State<_PhotoGalleryTab>
             itemCount: _photoMemories.length,
             itemBuilder: (context, index) {
               final memory = _photoMemories[index];
-              return _buildPhotoCard(memory);
+              return PhotoCardWidget(
+                memory: memory,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PhotoDetailPage(
+                        memory: memory,
+                        onDelete: () => _deletePhoto(memory),
+                      ),
+                    ),
+                  );
+                },
+              );
             },
           ),
         ),
       ],
     );
-  }
-
-  Widget _buildStatItem({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.white, size: 32),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            fontSize: 12,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPhotoCard(PhotoMemory memory) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PhotoDetailPage(
-              memory: memory,
-              onDelete: () => _deletePhoto(memory),
-            ),
-          ),
-        );
-      },
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        elevation: 4,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 사진
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    memory.photoUrl,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.grey[300],
-                        child: Icon(
-                          Icons.broken_image,
-                          size: 50,
-                          color: Colors.grey[400],
-                        ),
-                      );
-                    },
-                  ),
-                  // 그라데이션 오버레이
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 60,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [
-                            Colors.black.withOpacity(0.7),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // 정보
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    memory.destinationName,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today,
-                          size: 12, color: Colors.grey[600]),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          _formatDate(memory.timestamp),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[600],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
   }
 }
 
@@ -780,7 +531,10 @@ class _RoutineTabState extends State<_RoutineTab>
         _isLoading = false;
       });
     } catch (e) {
-      print('❌ 프로필 로드 실패: $e');
+      // 프로필 로드 실패 시 로그만 남기고 계속 진행
+      if (mounted) {
+        debugPrint('❌ 프로필 로드 실패: $e');
+      }
       setState(() => _isLoading = false);
     }
   }
@@ -790,41 +544,14 @@ class _RoutineTabState extends State<_RoutineTab>
     super.build(context);
 
     if (_isLoading) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('추천 루틴을 불러오는 중...'),
-          ],
-        ),
-      );
+      return const LoadingWidget(message: '추천 루틴을 불러오는 중...');
     }
 
-    if (_profile == null ||
-        _profile!.recentRecommendations.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.favorite_border, size: 80, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              '아직 추천받은 루틴이 없어요',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'AI 채팅에서 장소 추천을 받아보세요!',
-              style: TextStyle(color: Colors.grey[500]),
-            ),
-          ],
-        ),
+    if (_profile == null || _profile!.recentRecommendations.isEmpty) {
+      return const EmptyStateWidget(
+        icon: Icons.favorite_border,
+        title: '아직 추천받은 루틴이 없어요',
+        subtitle: 'AI 채팅에서 장소 추천을 받아보세요!',
       );
     }
 
@@ -832,41 +559,23 @@ class _RoutineTabState extends State<_RoutineTab>
       padding: const EdgeInsets.all(16),
       children: [
         // 통계 카드
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.purple[700]!, Colors.purple[500]!],
+        StatCardWidget(
+          margin: EdgeInsets.zero,
+          gradient: LinearGradient(
+            colors: [Colors.purple[700]!, Colors.purple[500]!],
+          ),
+          children: [
+            StatItemWidget(
+              icon: Icons.recommend,
+              label: '총 추천',
+              value: '${_profile!.recentRecommendations.length}',
             ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.purple.withOpacity(0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem(
-                icon: Icons.recommend,
-                label: '총 추천',
-                value: '${_profile!.recentRecommendations.length}',
-              ),
-              Container(
-                width: 1,
-                height: 40,
-                color: Colors.white.withOpacity(0.3),
-              ),
-              _buildStatItem(
-                icon: Icons.category,
-                label: '선호 카테고리',
-                value: '${_profile!.favoriteCategories.length}',
-              ),
-            ],
-          ),
+            StatItemWidget(
+              icon: Icons.category,
+              label: '선호 카테고리',
+              value: '${_profile!.favoriteCategories.length}',
+            ),
+          ],
         ),
 
         const SizedBox(height: 24),
@@ -882,151 +591,9 @@ class _RoutineTabState extends State<_RoutineTab>
         const SizedBox(height: 16),
 
         ...(_profile!.recentRecommendations.map((rec) {
-          return _buildRecommendationCard(rec);
+          return RecommendationCardWidget(recommendation: rec);
         })),
       ],
     );
-  }
-
-  Widget _buildStatItem({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.white, size: 32),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            fontSize: 12,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRecommendationCard(RecommendationHistory rec) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _getCategoryColor(rec.category).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    _getCategoryIcon(rec.category),
-                    color: _getCategoryColor(rec.category),
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        rec.title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getCategoryColor(rec.category).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          rec.category,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _getCategoryColor(rec.category),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (rec.description != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                rec.description!,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
-                const SizedBox(width: 4),
-                Text(
-                  _formatDate(rec.timestamp),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _getCategoryColor(String category) {
-    if (category.contains('힐링')) return Colors.green;
-    if (category.contains('활력')) return Colors.orange;
-    if (category.contains('문화')) return Colors.purple;
-    if (category.contains('야경')) return Colors.indigo;
-    if (category.contains('공원')) return Colors.teal;
-    return Colors.blue;
-  }
-
-  IconData _getCategoryIcon(String category) {
-    if (category.contains('힐링')) return Icons.spa;
-    if (category.contains('활력')) return Icons.local_fire_department;
-    if (category.contains('문화')) return Icons.palette;
-    if (category.contains('야경')) return Icons.nights_stay;
-    if (category.contains('공원')) return Icons.park;
-    return Icons.place;
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
   }
 }
