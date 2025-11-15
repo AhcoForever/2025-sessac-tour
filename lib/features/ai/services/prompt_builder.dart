@@ -289,7 +289,11 @@ $culturalSpaceData
       "distance": "2.3km (선택, 거리 정보가 있을 때)",
       "duration": "45분 (선택, 예상 소요 시간)",
       "cost": "무료 또는 5000원 (선택)",
-      "rating": 4.5 (선택, 1-5 사이 숫자)
+      "rating": 4.5 (선택, 1-5 사이 숫자),
+      "latitude": 37.544414 (필수, 위 데이터의 위도 그대로 사용),
+      "longitude": 127.037609 (필수, 위 데이터의 경도 그대로 사용),
+      "address": "서울 성동구 뚝섬로 273 (필수, 위 데이터의 주소 그대로 사용)",
+      "locationId": "관광콘텐츠인 경우 cid 값 (선택, 관광 콘텐츠 추천 시에만)"
     }
   ]
 }
@@ -313,21 +317,28 @@ $culturalSpaceData
 [데이터 활용 규칙]
 1. RAG 데이터 참고:
 - 서울시 문화행사 데이터
-- VisitSeoul 관광 콘텐츠 데이터
-- 서울시 주요 공원 데이터
-- 서울시 문화 공간 데이터 (도서관, 공연장, 문화예술회관 등)
+- VisitSeoul 관광 콘텐츠 데이터 (cid 포함)
+- 서울시 주요 공원 데이터 (위도/경도 포함)
+- 서울시 문화 공간 데이터 (위도/경도 포함)
 - 제공된 데이터 내에서만 추천
 - 데이터에 없으면 "정보가 없어서..."라고 솔직히 말하기
 
-2. 위치 정보:
+2. 위치 정보 필수 포함:
+- JSON 추천 시 반드시 위도(latitude)와 경도(longitude)를 포함해야 합니다
+- 공원/문화공간: 데이터의 좌표 정보를 그대로 복사
+- 관광콘텐츠: cid 값을 locationId에 포함 (위도/경도는 null)
+- 주소(address)도 데이터에서 그대로 복사
+- ⚠️ 위도/경도가 없는 데이터는 추천하지 마세요
+
+3. 사용자 위치 맥락:
 - 위치 정보가 있으면 동·구 맥락을 자연스럽게 녹여 추천
 - 예: "강남에 계시네? 그럼 코엑스 근처 카페 어때?"
 
-3. 시간 정보:
+4. 시간 정보:
 - 현재 시간대 고려
 - 아침/점심/오후/저녁/밤에 따라 적합한 활동 추천
 
-⚠️ 추천 시 반드시 위 정보에 있는 실제 데이터만 사용하세요. 없는 데이터를 만들어내지 마세요.''';
+⚠️ 추천 시 반드시 위 정보에 있는 실제 데이터만 사용하세요. 위도/경도 정보가 없는 장소는 추천하지 마세요.''';
   }
 
   /// 현재 시간 정보 프롬프트
@@ -468,6 +479,7 @@ $weatherSummary
       for (int i = 0; i < entry.value.length; i++) {
         final content = entry.value[i];
         buffer.writeln('${i + 1}. ${content.postSj}');
+        buffer.writeln('   🆔 ID: ${content.cid}');
         buffer.writeln('   🏷️ 카테고리: ${content.cateDepth.join(' > ')}');
 
         if (content.schdulInfoBgnde.isNotEmpty) {
@@ -518,7 +530,8 @@ $weatherSummary
           buffer.writeln('   📝 개요: $outline');
         }
 
-        buffer.writeln('   📍 위치: ${park.parkAddress}');
+        buffer.writeln('   📍 주소: ${park.parkAddress}');
+        buffer.writeln('   🗺️ 좌표: 위도 ${park.latitude}, 경도 ${park.longitude}');
 
         if (park.area.isNotEmpty) {
           buffer.writeln('   📏 면적: ${park.area}');
@@ -568,7 +581,8 @@ $weatherSummary
         final space = entry.value[i];
         buffer.writeln('${i + 1}. ${space.facilityName}');
 
-        buffer.writeln('   📍 위치: ${space.address} (${space.district})');
+        buffer.writeln('   📍 주소: ${space.address} (${space.district})');
+        buffer.writeln('   🗺️ 좌표: 위도 ${space.latitude}, 경도 ${space.longitude}');
 
         if (space.entranceFree != null && space.entranceFree!.isNotEmpty) {
           buffer.writeln('   💰 ${space.entranceFree}');

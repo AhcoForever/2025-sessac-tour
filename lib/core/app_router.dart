@@ -32,12 +32,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/',
       name: 'landing',
-      builder: (context, state) =>UserProfilePage()
+      builder: (context, state) =>
+          //UserProfilePage()
       // ChatProfileEditPage()
           //MapPage(),
       //ContentListPage()
       //CulturalEventsPage()
-      //LandingPage(),
+      LandingPage(),
     ),
     GoRoute(
       path: '/login',
@@ -69,7 +70,15 @@ final GoRouter appRouter = GoRouter(
       name: 'ai-chat',
       builder: (context, state) => AiChatPage(),
     ),
-    GoRoute(path: '/map', name: 'map', builder: (context, state) => MapPage()),
+    GoRoute(
+      path: '/map',
+      name: 'map',
+      builder: (context, state) {
+        // extra로 전달된 파라미터 받기
+        final extra = state.extra as Map<String, dynamic>?;
+        return MapPage(routeParams: extra);
+      },
+    ),
 
     GoRoute(
       path: '/profile',

@@ -8,6 +8,9 @@ class Recommendation {
   final double? rating; // 별점 (1-5)
   final String? imageUrl; // 이미지 URL (선택)
   final String? locationId; // 장소 ID (지도 연동용)
+  final double? latitude; // 위도 (길찾기용)
+  final double? longitude; // 경도 (길찾기용)
+  final String? address; // 주소
 
   Recommendation({
     required this.category,
@@ -19,6 +22,9 @@ class Recommendation {
     this.rating,
     this.imageUrl,
     this.locationId,
+    this.latitude,
+    this.longitude,
+    this.address,
   });
 
   factory Recommendation.fromJson(Map<String, dynamic> json) {
@@ -34,6 +40,13 @@ class Recommendation {
           : null,
       imageUrl: json['imageUrl'] as String?,
       locationId: json['locationId'] as String?,
+      latitude: json['latitude'] != null
+          ? (json['latitude'] as num).toDouble()
+          : null,
+      longitude: json['longitude'] != null
+          ? (json['longitude'] as num).toDouble()
+          : null,
+      address: json['address'] as String?,
     );
   }
 
@@ -48,6 +61,9 @@ class Recommendation {
       'rating': rating,
       'imageUrl': imageUrl,
       'locationId': locationId,
+      'latitude': latitude,
+      'longitude': longitude,
+      'address': address,
     };
   }
 }
