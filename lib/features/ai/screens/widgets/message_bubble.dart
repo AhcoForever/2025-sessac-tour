@@ -14,9 +14,32 @@ class MessageBubble extends StatelessWidget {
     this.character,
   });
 
+  /// 메시지 내용에서 추천 JSON 태그 부분을 제거합니다
+  String _getCleanContent() {
+    final content = message.content;
+    final startTag = '[RECOMMENDATIONS]';
+    final endTag = '[/RECOMMENDATIONS]';
+
+    final startIndex = content.indexOf(startTag);
+    if (startIndex == -1) {
+      return content;
+    }
+
+    final endIndex = content.indexOf(endTag);
+    if (endIndex == -1) {
+      // 아직 스트리밍 중이라 종료 태그가 없는 경우, 시작 태그 이전까지만 반환
+      return content.substring(0, startIndex).trim();
+    }
+
+    // 태그 부분을 제거하고 반환
+    return (content.substring(0, startIndex) +
+            content.substring(endIndex + endTag.length)).trim();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == MessageRole.user;
+    final displayContent = _getCleanContent();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -64,15 +87,16 @@ class MessageBubble extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        message.content,
-                        style: TextStyle(
-                          color: isUser
-                              ? Colors.white
-                              : Theme.of(context).colorScheme.onSurface,
-                          fontSize: 16,
+                      if (displayContent.isNotEmpty)
+                        Text(
+                          displayContent,
+                          style: TextStyle(
+                            color: isUser
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.onSurface,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 4),
                       Text(
                         _formatTime(message.timestamp),
