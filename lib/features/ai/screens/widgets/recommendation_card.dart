@@ -141,28 +141,63 @@ class RecommendationCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // 루틴 선택하기 버튼
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: () {
-                       context.goNamed("map");
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  // 길찾기 버튼 (위치 정보가 있는 경우에만 표시)
+                  if (recommendation.latitude != null &&
+                      recommendation.longitude != null)
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          // 위치 정보와 함께 지도 페이지로 이동
+                          context.goNamed(
+                            "map",
+                            extra: {
+                              'destination': recommendation,
+                              'showRoute': true,
+                            },
+                          );
+                        },
+                        icon: const Icon(Icons.directions),
+                        label: const Text(
+                          '길찾기',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
-                      child: const Text(
-                        '루틴 선택하기',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
+                    )
+                  else
+                    // 위치 정보가 없는 경우 지도로만 이동
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          context.goNamed("map");
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          '지도 보기',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),

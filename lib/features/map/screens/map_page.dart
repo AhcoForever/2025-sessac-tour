@@ -6,6 +6,8 @@ import 'package:custom_info_window/custom_info_window.dart';
 import '../services/location_service.dart';
 import '../services/marker_service.dart';
 import '../services/destination_service.dart';
+import '../services/google_routes_service.dart';
+import '../models/route_info.dart';
 import '../constants/map_constants.dart';
 import 'widgets/marker_info_window.dart';
 import 'widgets/location_fab.dart';
@@ -19,9 +21,12 @@ import '../../public_data/services/seoulapi_service.dart';
 import '../../public_data/models/content_info.dart';
 import '../../public_data/models/night_spot.dart';
 import '../../camera/screens/photo_capture_page.dart';
+import '../../ai/models/recommendation.dart';
 
 class MapPage extends StatefulWidget {
-  const MapPage({super.key});
+  final Map<String, dynamic>? routeParams;
+
+  const MapPage({super.key, this.routeParams});
 
   @override
   State<MapPage> createState() => _MapPageState();
@@ -32,6 +37,7 @@ class _MapPageState extends State<MapPage> {
   final LocationService _locationService = LocationService();
   final MarkerService _markerService = MarkerService();
   final DestinationService _destinationService = DestinationService();
+  final GoogleRoutesService _routesService = GoogleRoutesService();
   final CustomInfoWindowController _customInfoWindowController =
       CustomInfoWindowController();
   final VisitSeoulApiService _visitSeoulApiService = VisitSeoulApiService();
@@ -41,6 +47,7 @@ class _MapPageState extends State<MapPage> {
   Position? _currentPosition;
   bool _isLoadingLocation = true;
   final Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {}; // 경로 표시용
   double _currentZoom = MapConstants.defaultZoom;
   double _previousZoom = MapConstants.defaultZoom;
   StreamSubscription<Position>? _positionStreamSubscription;
@@ -54,10 +61,32 @@ class _MapPageState extends State<MapPage> {
   double? _distanceToDestination;
   bool _hasShownArrivalDialog = false;
 
+  // AI 추천 경로 관련
+  Recommendation? _aiDestination;
+  RouteInfo? _routeInfo;
+  bool _isLoadingRoute = false;
+  bool _mapReady = false; // 지도가 준비되었는지 여부
+  bool _hasTriedShowingRoute = false; // 경로 표시를 시도했는지 여부
+
   @override
   void initState() {
     super.initState();
+    _checkRouteParams();
     _initializeMap();
+  }
+
+  /// AI 채팅에서 전달된 경로 파라미터 확인
+  void _checkRouteParams() {
+    if (widget.routeParams != null) {
+      final destination = widget.routeParams!['destination'] as Recommendation?;
+      final showRoute = widget.routeParams!['showRoute'] as bool? ?? false;
+
+      if (destination != null && showRoute) {
+        _aiDestination = destination;
+        debugPrint('🎯 AI 추천 목적지: ${destination.title}');
+        debugPrint('📍 좌표: ${destination.latitude}, ${destination.longitude}');
+      }
+    }
   }
 
   /// 지도 초기화 (순차적으로 실행)
@@ -76,6 +105,7 @@ class _MapPageState extends State<MapPage> {
     await _getCurrentLocation();
     // 7. 실시간 위치 추적 시작
     _startLocationTracking();
+    // 8. AI 추천 경로는 onMapCreated에서 표시 (mapController가 준비된 후)
   }
 
   /// 관광지 마커 아이콘 로드 (기본 빨간색 마커 사용)
@@ -356,6 +386,9 @@ class _MapPageState extends State<MapPage> {
     mapController = controller;
     _customInfoWindowController.googleMapController = controller;
     _updateMarkerScreenPosition();
+
+    _mapReady = true;
+    _tryShowAiRoute();
   }
 
   /// 마커의 화면 좌표 업데이트
@@ -422,6 +455,9 @@ class _MapPageState extends State<MapPage> {
       _currentPosition = position;
       _isLoadingLocation = false;
     });
+
+    // 위치가 준비되었으면 AI 경로 표시 시도
+    _tryShowAiRoute();
   }
 
   /// 사용자 위치에 마커 추가
@@ -498,6 +534,7 @@ class _MapPageState extends State<MapPage> {
               bearing: MapConstants.defaultBearing,
             ),
             markers: _markers,
+            polylines: _polylines, // AI 추천 경로 표시
             buildingsEnabled: true,
             mapType: MapType.normal,
             myLocationEnabled: false,
@@ -547,6 +584,71 @@ class _MapPageState extends State<MapPage> {
               destinationName: _selectedDestination!.postSj,
               distance: _distanceToDestination!,
             ),
+
+          // AI 추천 경로 안내
+          if (_routeInfo != null && _aiDestination != null)
+            Positioned(
+              top: 60,
+              left: 16,
+              right: 16,
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.navigation,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _aiDestination!.title,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: _clearAiRoute,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.directions_walk,
+                            size: 20,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_routeInfo!.distanceInKm} · ${_routeInfo!.durationInMinutes}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
       floatingActionButton: LocationFab(
@@ -554,6 +656,157 @@ class _MapPageState extends State<MapPage> {
         isLoading: _isLoadingLocation,
       ),
     );
+  }
+
+  // ==================== AI 추천 경로 관련 메서드 ====================
+
+  /// AI 추천 경로 표시
+  Future<void> _showAiRecommendedRoute() async {
+    if (_aiDestination == null ||
+        _aiDestination!.latitude == null ||
+        _aiDestination!.longitude == null ||
+        _currentPosition == null) {
+      debugPrint('❌ 경로 표시 불가: 목적지 또는 현재 위치 정보 없음');
+      return;
+    }
+
+    setState(() => _isLoadingRoute = true);
+
+    try {
+      final start = LatLng(
+        _currentPosition!.latitude,
+        _currentPosition!.longitude,
+      );
+      final goal = LatLng(
+        _aiDestination!.latitude!,
+        _aiDestination!.longitude!,
+      );
+
+      debugPrint('🚀 경로 조회 시작: $start → $goal');
+
+      // Google Routes API로 경로 조회
+      final routeInfo = await _routesService.getWalkingRoute(
+        start: start,
+        goal: goal,
+      );
+
+      if (routeInfo != null && mounted) {
+        setState(() {
+          _routeInfo = routeInfo;
+          _isLoadingRoute = false;
+        });
+
+        // 경로 Polyline 그리기
+        _drawRoute(routeInfo.path);
+
+        // 목적지 마커 추가
+        _addAiDestinationMarker(goal);
+
+        // 카메라를 경로가 보이도록 조정
+        _fitRouteBounds(routeInfo.path);
+
+        debugPrint('✅ 경로 표시 완료: ${routeInfo.distanceInKm}, ${routeInfo.durationInMinutes}');
+      } else {
+        debugPrint('❌ 경로 조회 실패');
+        setState(() => _isLoadingRoute = false);
+      }
+    } catch (e) {
+      debugPrint('❌ 경로 표시 에러: $e');
+      setState(() => _isLoadingRoute = false);
+    }
+  }
+
+  /// 경로를 Polyline으로 그리기
+  void _drawRoute(List<LatLng> path) {
+    final polyline = Polyline(
+      polylineId: const PolylineId('ai_route'),
+      points: path,
+      color: Colors.blue,
+      width: 5,
+      startCap: Cap.roundCap,
+      endCap: Cap.roundCap,
+      geodesic: true,
+    );
+
+    setState(() {
+      _polylines.clear();
+      _polylines.add(polyline);
+    });
+  }
+
+  /// AI 목적지 마커 추가
+  void _addAiDestinationMarker(LatLng position) {
+    final marker = Marker(
+      markerId: const MarkerId('ai_destination'),
+      position: position,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+      infoWindow: InfoWindow(
+        title: _aiDestination!.title,
+        snippet: _aiDestination!.address ?? '목적지',
+      ),
+    );
+
+    setState(() {
+      // 기존 AI 목적지 마커 제거 후 추가
+      _markers.removeWhere((m) => m.markerId.value == 'ai_destination');
+      _markers.add(marker);
+    });
+  }
+
+  /// 경로가 모두 보이도록 카메라 조정
+  void _fitRouteBounds(List<LatLng> path) {
+    if (path.isEmpty || mapController == null) return;
+
+    double minLat = path.first.latitude;
+    double maxLat = path.first.latitude;
+    double minLng = path.first.longitude;
+    double maxLng = path.first.longitude;
+
+    for (final point in path) {
+      if (point.latitude < minLat) minLat = point.latitude;
+      if (point.latitude > maxLat) maxLat = point.latitude;
+      if (point.longitude < minLng) minLng = point.longitude;
+      if (point.longitude > maxLng) maxLng = point.longitude;
+    }
+
+    final bounds = LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
+
+    mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(bounds, 100), // 100픽셀 패딩
+    );
+  }
+
+  /// AI 경로 표시 시도 (지도와 위치가 모두 준비되었을 때)
+  void _tryShowAiRoute() {
+    if (_aiDestination != null &&
+        _currentPosition != null &&
+        _mapReady &&
+        !_hasTriedShowingRoute) {
+      _hasTriedShowingRoute = true;
+      // 약간의 딜레이를 주어 지도가 완전히 준비되도록 함
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _showAiRecommendedRoute();
+      });
+    }
+  }
+
+  /// AI 경로 초기화
+  void _clearAiRoute() {
+    setState(() {
+      _routeInfo = null;
+      _aiDestination = null;
+      _polylines.clear();
+      _markers.removeWhere((m) => m.markerId.value == 'ai_destination');
+      _hasTriedShowingRoute = false;
+    });
+
+    // 현재 위치로 카메라 이동
+    if (_currentPosition != null) {
+      _moveToCurrentLocation();
+    }
   }
 
   @override
