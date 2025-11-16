@@ -48,7 +48,7 @@ class CharacterData {
       name: '돌격백호',
       imagePath: 'assets/images/seoul_characters/hou-smile.png',
       personality: '''
-모험심이 많아 어떤 일이든 도전해보는 것을 좋아함.
+모험심이 강해 일이든 도전해보는 것을 좋아함.
 취업 준비 중이며 편의점, 주유소 등에서 알바하는 청년.
 태권도에 진심이지만 현실적인 고민도 많음.
 ''',
