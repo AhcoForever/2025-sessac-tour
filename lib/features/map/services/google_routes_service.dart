@@ -25,6 +25,14 @@ class GoogleRoutesService {
     String mode = 'walking',
   }) async {
     try {
+      // 좌표 유효성 검증
+      if (!_isValidCoordinate(start) || !_isValidCoordinate(goal)) {
+        debugPrint('❌ 유효하지 않은 좌표');
+        debugPrint('   출발: ${start.latitude}, ${start.longitude}');
+        debugPrint('   도착: ${goal.latitude}, ${goal.longitude}');
+        return null;
+      }
+
       // 쿼리 파라미터 구성
       final queryParams = {
         'origin': '${start.latitude},${start.longitude}',
@@ -40,6 +48,7 @@ class GoogleRoutesService {
       debugPrint('   출발: ${start.latitude}, ${start.longitude}');
       debugPrint('   도착: ${goal.latitude}, ${goal.longitude}');
       debugPrint('   이동 수단: $mode');
+      debugPrint('   요청 URL: $uri');
 
       final response = await http.get(uri);
 
@@ -55,6 +64,17 @@ class GoogleRoutesService {
           debugPrint('❌ 경로 조회 실패: ${data['status']}');
           if (data['error_message'] != null) {
             debugPrint('   에러 메시지: ${data['error_message']}');
+          }
+          // 전체 응답 출력 (디버깅용)
+          debugPrint('📄 전체 응답: ${response.body}');
+
+          // ZERO_RESULTS 상세 안내
+          if (data['status'] == 'ZERO_RESULTS') {
+            debugPrint('💡 ZERO_RESULTS 해결 방법:');
+            debugPrint('   1. 좌표가 올바른지 확인 (위도: -90~90, 경도: -180~180)');
+            debugPrint('   2. 출발지와 목적지가 너무 멀지 않은지 확인');
+            debugPrint('   3. 다른 이동 수단(driving)으로 시도해보기');
+            debugPrint('   4. 좌표가 실제 도로망에 연결되어 있는지 확인');
           }
           return null;
         }
@@ -157,5 +177,49 @@ class GoogleRoutesService {
     final c = 2 * asin(sqrt(a));
 
     return earthRadius * c;
+  }
+
+  /// 좌표 유효성 검증
+  bool _isValidCoordinate(LatLng coord) {
+    // 위도: -90 ~ 90
+    // 경도: -180 ~ 180
+    if (coord.latitude < -90 || coord.latitude > 90) {
+      debugPrint('⚠️ 유효하지 않은 위도: ${coord.latitude}');
+      return false;
+    }
+    if (coord.longitude < -180 || coord.longitude > 180) {
+      debugPrint('⚠️ 유효하지 않은 경도: ${coord.longitude}');
+      return false;
+    }
+    // 0,0 좌표는 실제 데이터가 아닐 가능성이 높음
+    if (coord.latitude == 0 && coord.longitude == 0) {
+      debugPrint('⚠️ 좌표가 0,0 입니다 (데이터 없음)');
+      return false;
+    }
+    return true;
+  }
+
+  /// 테스트용: 알려진 좌표로 API 동작 확인
+  Future<void> testWithKnownLocations() async {
+    debugPrint('🧪 알려진 좌표로 테스트 시작');
+
+    // 서울시청 -> 경복궁 (약 1.5km)
+    final seoulCityHall = LatLng(37.5663, 126.9779);
+    final gyeongbokgung = LatLng(37.5796, 126.9770);
+
+    debugPrint('테스트: 서울시청 -> 경복궁');
+    final result = await getWalkingRoute(
+      start: seoulCityHall,
+      goal: gyeongbokgung,
+      mode: 'walking',
+    );
+
+    if (result != null) {
+      debugPrint('✅ 테스트 성공: API가 정상 작동합니다');
+      debugPrint('   거리: ${result.distanceInKm}');
+      debugPrint('   시간: ${result.durationInMinutes}');
+    } else {
+      debugPrint('❌ 테스트 실패: API 키 또는 설정 문제일 수 있습니다');
+    }
   }
 }

@@ -74,12 +74,11 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 const SizedBox(height: 60),
 
-                // 로고 아이콘
-                Icon(
-                  Icons.travel_explore,
-                  size: 80,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+            Image.asset(
+              'assets/icons/SOFE-logo.png',
+              width: 150,
+              height: 150,
+            ),
                 const SizedBox(height: 24),
 
                 // 앱 이름
@@ -87,6 +86,7 @@ class _LoginPageState extends State<LoginPage> {
                   'SOFE',
                   style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: Color(0xFF4387E4),
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -94,7 +94,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 // 서브 타이틀
                 Text(
-                  'Design your Soulful Seoul Life',
+                  'Story Of Feeling Everyday',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

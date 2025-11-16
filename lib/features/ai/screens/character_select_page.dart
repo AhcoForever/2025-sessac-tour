@@ -39,10 +39,11 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
     final currentCharacter = CharacterData.characters[_currentIndex];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('가이드 선택'), centerTitle: true),
       body: SafeArea(
         child: Column(
           children: [
+            const SizedBox(height: 24),
+
             // 상단 설명
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -177,7 +178,6 @@ class _CharacterPage extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
 
-
           // 성격 설명
           Container(
             padding: const EdgeInsets.all(20),
@@ -226,4 +226,3 @@ class _CharacterPage extends StatelessWidget {
     );
   }
 }
-

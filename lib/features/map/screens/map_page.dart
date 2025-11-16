@@ -649,6 +649,18 @@ class _MapPageState extends State<MapPage> {
                 ),
               ),
             ),
+
+          // 디버그용 테스트 버튼
+          Positioned(
+            bottom: 100,
+            right: 16,
+            child: FloatingActionButton(
+              heroTag: 'test_api',
+              onPressed: _testDirectionsApi,
+              backgroundColor: Colors.orange,
+              child: const Icon(Icons.bug_report),
+            ),
+          ),
         ],
       ),
       floatingActionButton: LocationFab(
@@ -682,9 +694,15 @@ class _MapPageState extends State<MapPage> {
         _aiDestination!.longitude!,
       );
 
-      debugPrint('🚀 경로 조회 시작: $start → $goal');
+      debugPrint('🚀 경로 조회 시작');
+      debugPrint('   출발 좌표: (${start.latitude}, ${start.longitude})');
+      debugPrint('   도착 좌표: (${goal.latitude}, ${goal.longitude})');
 
-      // Google Routes API로 경로 조회
+      // 직선 거리 계산
+      final straightDistance = _routesService.calculateDistance(start, goal);
+      debugPrint('   직선 거리: ${(straightDistance / 1000).toStringAsFixed(2)}km');
+
+      // Google Directions API로 경로 조회
       final routeInfo = await _routesService.getWalkingRoute(
         start: start,
         goal: goal,
@@ -706,9 +724,31 @@ class _MapPageState extends State<MapPage> {
         _fitRouteBounds(routeInfo.path);
 
         debugPrint('✅ 경로 표시 완료: ${routeInfo.distanceInKm}, ${routeInfo.durationInMinutes}');
+
+        // 사용자에게 성공 알림
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('경로 안내: ${routeInfo.distanceInKm}, ${routeInfo.durationInMinutes}'),
+              backgroundColor: Colors.blue[700],
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       } else {
         debugPrint('❌ 경로 조회 실패');
         setState(() => _isLoadingRoute = false);
+
+        // 사용자에게 실패 알림
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('경로를 찾을 수 없습니다. 로그를 확인해주세요.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
       }
     } catch (e) {
       debugPrint('❌ 경로 표시 에러: $e');
@@ -806,6 +846,52 @@ class _MapPageState extends State<MapPage> {
     // 현재 위치로 카메라 이동
     if (_currentPosition != null) {
       _moveToCurrentLocation();
+    }
+  }
+
+  /// 디버그용: API 테스트
+  Future<void> _testDirectionsApi() async {
+    debugPrint('🧪 ========== API 테스트 시작 ==========');
+
+    // 테스트 1: 알려진 좌표로 API 동작 확인
+    await _routesService.testWithKnownLocations();
+
+    // 테스트 2: 현재 위치에서 가까운 관광지로 경로 찾기
+    if (_currentPosition != null && _touristSpots.isNotEmpty) {
+      final nearbySpot = _touristSpots.first;
+      if (nearbySpot.traffic?.mapPositionY != null &&
+          nearbySpot.traffic?.mapPositionX != null) {
+        final spotLat = double.tryParse(nearbySpot.traffic!.mapPositionY!);
+        final spotLng = double.tryParse(nearbySpot.traffic!.mapPositionX!);
+
+        if (spotLat != null && spotLng != null) {
+          debugPrint('\n🧪 테스트 2: 현재 위치 -> ${nearbySpot.postSj}');
+          debugPrint('   출발: ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
+          debugPrint('   도착: $spotLat, $spotLng');
+
+          final result = await _routesService.getWalkingRoute(
+            start: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+            goal: LatLng(spotLat, spotLng),
+          );
+
+          if (result != null) {
+            debugPrint('✅ 테스트 2 성공');
+          } else {
+            debugPrint('❌ 테스트 2 실패');
+          }
+        }
+      }
+    }
+
+    debugPrint('🧪 ========== API 테스트 종료 ==========');
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('API 테스트 완료. 로그를 확인하세요.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 

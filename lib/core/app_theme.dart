@@ -1,22 +1,21 @@
 import 'package:flex_color_scheme/flex_color_scheme.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-
+import 'package:flutter/cupertino.dart';
 
 abstract final class AppTheme {
   // The FlexColorScheme defined light mode ThemeData.
-  static ThemeData lightTheme = FlexThemeData.light(
+  static ThemeData light = FlexThemeData.light(
     // User defined custom colors made with FlexSchemeColor() API.
     colors: const FlexSchemeColor(
-      primary: Color(0xFFFF6796),
-      primaryContainer: Color(0xFFF6EFF0),
+      primary: Color(0xFF4387E4),
+      primaryContainer: Color(0xFFA1C3F1),
       secondary: Color(0xFF40C389),
       secondaryContainer: Color(0xFFDCF4E9),
       tertiary: Color(0xFFA6D6FF),
       tertiaryContainer: Color(0xFFEBF6FF),
       appBarColor: Color(0xFFDCF4E9),
-      error: Color(0xFFC42929),
-      errorContainer: Color(0xFFFFDAD6),
+      error: Color(0xFFCF4242),
+      errorContainer: Color(0xFFFFDDDA),
     ),
     // Input color modifiers.
     useMaterial3ErrorColors: true,
@@ -33,16 +32,15 @@ abstract final class AppTheme {
     visualDensity: FlexColorScheme.comfortablePlatformDensity,
     cupertinoOverrideTheme: const CupertinoThemeData(applyThemeToAll: true),
     useMaterial3: false,
-    fontFamily: 'Pretendard',
   );
 
   // The FlexColorScheme defined dark mode ThemeData.
-  static ThemeData darkTheme = FlexThemeData.dark(
+  static ThemeData dark = FlexThemeData.dark(
     // User defined custom colors made with FlexSchemeColor() API.
     colors: const FlexSchemeColor(
       primary: Color(0xFF9FC9FF),
       primaryContainer: Color(0xFF00325B),
-      primaryLightRef: Color(0xFFFF6796), // The color of light mode primary
+      primaryLightRef: Color(0xFF4387E4), // The color of light mode primary
       secondary: Color(0xFFFFB59D),
       secondaryContainer: Color(0xFF872100),
       secondaryLightRef: Color(0xFF40C389), // The color of light mode secondary
@@ -69,6 +67,5 @@ abstract final class AppTheme {
     visualDensity: FlexColorScheme.comfortablePlatformDensity,
     cupertinoOverrideTheme: const CupertinoThemeData(applyThemeToAll: true),
     useMaterial3: false,
-    fontFamily: 'Pretendard',
   );
 }

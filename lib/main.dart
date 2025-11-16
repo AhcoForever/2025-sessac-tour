@@ -27,9 +27,9 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
 
       // FlexColorScheme 테마 적용
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.light,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
 
       // GoRouter 설정
       routerConfig: appRouter,
