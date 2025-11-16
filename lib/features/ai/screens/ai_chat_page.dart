@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
@@ -50,6 +51,9 @@ class _AiChatPageState extends State<AiChatPage> {
   String? _selectedCategory; // 선택된 카테고리
   Position? _currentPosition; // 현재 위치
   String? _currentLocation; // 현재 위치 설명 (예: "강남구")
+
+  // 토큰 절약: 위치 기반 필터링 반경 (미터)
+  static const double _filterRadiusMeters = 5000; // 5km
 
   // 카테고리별 예시 질문
   final Map<String, List<String>> _exampleQuestions = {
@@ -181,10 +185,10 @@ class _AiChatPageState extends State<AiChatPage> {
     });
 
     try {
-      // 서울시 문화행사 100개 가져오기
+      // 서울시 문화행사 20개 가져오기 (토큰 절약)
       final events = await _seoulApiService.getCulturalEvent(
         startIndex: 1,
-        endIndex: 100,
+        endIndex: 20,
       );
 
       setState(() {
@@ -205,7 +209,7 @@ class _AiChatPageState extends State<AiChatPage> {
   /// VisitSeoul 관광 콘텐츠 데이터 로드 (RAG)
   Future<void> _loadTourContents() async {
     try {
-      // VisitSeoul 관광 콘텐츠 100개 가져오기 (한국어)
+      // VisitSeoul 관광 콘텐츠 20개 가져오기 (토큰 절약)
       final response = await _visitSeoulApiService.getContentList(
         langCodeId: 'ko',
         sortType: 'latest',
@@ -213,10 +217,10 @@ class _AiChatPageState extends State<AiChatPage> {
       );
 
       if (response != null) {
-        // 진행 중인 콘텐츠만 필터링
+        // 진행 중인 콘텐츠만 필터링 (토큰 절약: 20개로 제한)
         final ongoingContents = response.data
             .where((content) => content.isOngoing())
-            .take(100)
+            .take(20)
             .toList();
 
         setState(() {
@@ -236,18 +240,43 @@ class _AiChatPageState extends State<AiChatPage> {
   /// 서울시 공원 정보 데이터 로드 (RAG)
   Future<void> _loadParkInfo() async {
     try {
-      // 서울시 공원 정보 50개 가져오기
+      // 서울시 공원 정보 20개 가져오기 (토큰 절약)
       final response = await _seoulApiService.getParkInfo(
         startIndex: 1,
-        endIndex: 50,
+        endIndex: 20,
       );
 
       if (response != null && response.result.isSuccess) {
+        // 위치 기반 필터링 (5km 이내)
+        List<ParkInfo> filteredParks = response.row;
+
+        if (_currentPosition != null) {
+          filteredParks = response.row.where((park) {
+            try {
+              // 좌표를 String에서 double로 파싱
+              final parkLat = double.parse(park.latitude);
+              final parkLng = double.parse(park.longitude);
+
+              final distance = Geolocator.distanceBetween(
+                _currentPosition!.latitude,
+                _currentPosition!.longitude,
+                parkLat,
+                parkLng,
+              );
+              return distance <= _filterRadiusMeters;
+            } catch (e) {
+              return true; // 좌표 파싱 실패 시 포함
+            }
+          }).toList();
+
+          print('📍 공원 필터링: ${response.row.length}개 → ${filteredParks.length}개 (5km 이내)');
+        }
+
         setState(() {
-          _parkInfos = response.row;
+          _parkInfos = filteredParks;
         });
 
-        print('✅ 공원 정보 ${response.row.length}개 로드 완료');
+        print('✅ 공원 정보 ${filteredParks.length}개 로드 완료');
       }
     } catch (e) {
       print('❌ 공원 정보 로드 실패: $e');
@@ -260,18 +289,43 @@ class _AiChatPageState extends State<AiChatPage> {
   /// 서울시 문화 공간 정보 데이터 로드 (RAG)
   Future<void> _loadCulturalSpace() async {
     try {
-      // 서울시 문화 공간 정보 50개 가져오기
+      // 서울시 문화 공간 정보 20개 가져오기 (토큰 절약)
       final response = await _seoulApiService.getCulturalSpace(
         startIndex: 1,
-        endIndex: 50,
+        endIndex: 20,
       );
 
       if (response != null && response.result.isSuccess) {
+        // 위치 기반 필터링 (5km 이내)
+        List<CulturalSpace> filteredSpaces = response.row;
+
+        if (_currentPosition != null) {
+          filteredSpaces = response.row.where((space) {
+            try {
+              // 좌표를 String에서 double로 파싱
+              final spaceLat = double.parse(space.latitude);
+              final spaceLng = double.parse(space.longitude);
+
+              final distance = Geolocator.distanceBetween(
+                _currentPosition!.latitude,
+                _currentPosition!.longitude,
+                spaceLat,
+                spaceLng,
+              );
+              return distance <= _filterRadiusMeters;
+            } catch (e) {
+              return true; // 좌표 파싱 실패 시 포함
+            }
+          }).toList();
+
+          print('📍 문화공간 필터링: ${response.row.length}개 → ${filteredSpaces.length}개 (5km 이내)');
+        }
+
         setState(() {
-          _culturalSpaces = response.row;
+          _culturalSpaces = filteredSpaces;
         });
 
-        print('✅ 문화 공간 정보 ${response.row.length}개 로드 완료');
+        print('✅ 문화 공간 정보 ${filteredSpaces.length}개 로드 완료');
       }
     } catch (e) {
       print('❌ 문화 공간 정보 로드 실패: $e');
@@ -331,9 +385,17 @@ class _AiChatPageState extends State<AiChatPage> {
     String accumulatedText = '';
 
     try {
+      // 토큰 절약: 최근 10개 메시지만 전송 (5턴 대화)
+      final messagesToSend = _messages.where((msg) => msg != assistantMessage).toList();
+      final recentMessages = messagesToSend.length > 10
+          ? messagesToSend.sublist(messagesToSend.length - 10)
+          : messagesToSend;
+
+      print('💬 메시지 전송: ${messagesToSend.length}개 → ${recentMessages.length}개 (최근 10개로 제한)');
+
       // Claude API 스트리밍 호출
       final stream = _claudeService.sendMessageStream(
-        messages: _messages.where((msg) => msg != assistantMessage).toList(),
+        messages: recentMessages,
         systemPrompt: _systemPrompt,
         maxTokens: 2048,
       );
@@ -554,9 +616,17 @@ class _AiChatPageState extends State<AiChatPage> {
     String accumulatedText = '';
 
     try {
+      // 토큰 절약: 최근 10개 메시지만 전송 (5턴 대화)
+      final messagesToSend = _messages.where((msg) => msg != assistantMessage).toList();
+      final recentMessages = messagesToSend.length > 10
+          ? messagesToSend.sublist(messagesToSend.length - 10)
+          : messagesToSend;
+
+      print('💬 메시지 전송: ${messagesToSend.length}개 → ${recentMessages.length}개 (최근 10개로 제한)');
+
       // Claude API 스트리밍 호출
       final stream = _claudeService.sendMessageStream(
-        messages: _messages.where((msg) => msg != assistantMessage).toList(),
+        messages: recentMessages,
         systemPrompt: _systemPrompt,
         maxTokens: 2048,
       );
