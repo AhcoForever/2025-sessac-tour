@@ -31,6 +31,7 @@ AI 캐릭터와 대화하며 오늘의 활동을 추천받고, 이동 중 수집
 ## 주요 기능
 ### 1. 캐릭터 기반 AI 대화형 여가 추천
 <img src="docs/screenshots/character_select_page.gif" width="300">
+<img src="docs/screenshots/chat-path.gif" width="300">
 
 - 소울해치, 댕댕청룡, 돌격백호 중 선택
 - 실시간 대화로 감정·시간·거리 파악

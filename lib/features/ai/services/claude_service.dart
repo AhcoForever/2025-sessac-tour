@@ -33,9 +33,15 @@ class ClaudeService {
             .toList(),
       };
 
-      // 시스템 프롬프트가 있으면 추가
+      // 시스템 프롬프트가 있으면 Prompt Caching과 함께 추가
       if (systemPrompt != null && systemPrompt.isNotEmpty) {
-        requestBody['system'] = systemPrompt;
+        requestBody['system'] = [
+          {
+            'type': 'text',
+            'text': systemPrompt,
+            'cache_control': {'type': 'ephemeral'}, // 5분간 캐싱
+          }
+        ];
       }
 
       // API 요청
@@ -90,9 +96,15 @@ class ClaudeService {
         'stream': true,
       };
 
-      // 시스템 프롬프트가 있으면 추가
+      // 시스템 프롬프트가 있으면 Prompt Caching과 함께 추가
       if (systemPrompt != null && systemPrompt.isNotEmpty) {
-        requestBody['system'] = systemPrompt;
+        requestBody['system'] = [
+          {
+            'type': 'text',
+            'text': systemPrompt,
+            'cache_control': {'type': 'ephemeral'}, // 5분간 캐싱
+          }
+        ];
       }
 
       final request = http.Request('POST', Uri.parse(_apiUrl));

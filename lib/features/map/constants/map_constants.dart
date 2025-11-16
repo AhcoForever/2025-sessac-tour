@@ -61,7 +61,7 @@ abstract final class MapConstants {
   // ========== API 설정 ==========
 
   /// 관광지 데이터 로드 개수
-  static const int touristSpotsLoadCount = 10;
+  static const int touristSpotsLoadCount = 50;
 
   /// 야경명소 데이터 시작 인덱스
   static const int nightSpotsStartIndex = 1;

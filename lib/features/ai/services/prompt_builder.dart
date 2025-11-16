@@ -415,7 +415,7 @@ $weatherSummary
   }
 
 
-  /// 문화행사 데이터 포맷팅
+  /// 문화행사 데이터 포맷팅 (토큰 절약: 간소화)
   static String _formatCulturalEvents(List<CulturalEvent> events) {
     if (events.isEmpty) {
       return '현재 문화행사 정보를 불러올 수 없습니다.';
@@ -432,27 +432,20 @@ $weatherSummary
       groupedEvents.putIfAbsent(category, () => []).add(event);
     }
 
-    // 카테고리별로 출력
+    // 카테고리별로 간소화된 형식으로 출력
     for (var entry in groupedEvents.entries) {
-      buffer.writeln('## ${entry.key} (${entry.value.length}개)');
-
-      for (int i = 0; i < entry.value.length; i++) {
-        final event = entry.value[i];
-        buffer.writeln('${i + 1}. ${event.title}');
-        buffer.writeln('   📍 위치: ${event.place} (${event.guName})');
-        buffer.writeln('   📅 기간: ${event.startDate} ~ ${event.endDate}');
-        buffer.writeln('   💰 요금: ${event.useFee}');
-        if (event.orgName.isNotEmpty) {
-          buffer.writeln('   🏢 주관: ${event.orgName}');
-        }
-        buffer.writeln();
+      buffer.writeln('## ${entry.key}');
+      for (var event in entry.value) {
+        // 핵심 정보만: 제목 | 위치 | 기간 | 요금
+        buffer.writeln('- ${event.title} | ${event.guName} ${event.place} | ${event.startDate}~${event.endDate} | ${event.useFee}');
       }
+      buffer.writeln();
     }
 
     return buffer.toString();
   }
 
-  /// 관광 콘텐츠 데이터 포맷팅
+  /// 관광 콘텐츠 데이터 포맷팅 (토큰 절약: 간소화)
   static String _formatTourContents(List<ContentListItem> contents) {
     if (contents.isEmpty) {
       return '현재 관광 콘텐츠 정보를 불러올 수 없습니다.';
@@ -465,39 +458,29 @@ $weatherSummary
     // 카테고리별 그룹화
     final groupedContents = <String, List<ContentListItem>>{};
     for (var content in contents) {
-      // 첫 번째 depth 카테고리를 사용
       final category = content.cateDepth.isNotEmpty
           ? content.cateDepth.first
           : '기타';
       groupedContents.putIfAbsent(category, () => []).add(content);
     }
 
-    // 카테고리별로 출력
+    // 카테고리별로 간소화된 형식으로 출력
     for (var entry in groupedContents.entries) {
-      buffer.writeln('## ${entry.key} (${entry.value.length}개)');
-
-      for (int i = 0; i < entry.value.length; i++) {
-        final content = entry.value[i];
-        buffer.writeln('${i + 1}. ${content.postSj}');
-        buffer.writeln('   🆔 ID: ${content.cid}');
-        buffer.writeln('   🏷️ 카테고리: ${content.cateDepth.join(' > ')}');
-
-        if (content.schdulInfoBgnde.isNotEmpty) {
-          buffer.writeln('   📅 기간: ${content.schdulInfoBgnde} ~ ${content.schdulInfoEndde}');
-        }
-
-        if (content.sumry.isNotEmpty) {
-          buffer.writeln('   📝 요약: ${content.sumry}');
-        }
-
-        buffer.writeln();
+      buffer.writeln('## ${entry.key}');
+      for (var content in entry.value) {
+        // 핵심 정보만: 제목 | ID | 요약(50자)
+        final summary = content.sumry.isNotEmpty
+            ? (content.sumry.length > 50 ? '${content.sumry.substring(0, 50)}...' : content.sumry)
+            : '';
+        buffer.writeln('- ${content.postSj} | cid:${content.cid} | $summary');
       }
+      buffer.writeln();
     }
 
     return buffer.toString();
   }
 
-  /// 공원 정보 데이터 포맷팅
+  /// 공원 정보 데이터 포맷팅 (토큰 절약: 간소화)
   static String _formatParkInfo(List<ParkInfo> parks) {
     if (parks.isEmpty) {
       return '현재 공원 정보를 불러올 수 없습니다.';
@@ -514,49 +497,21 @@ $weatherSummary
       groupedParks.putIfAbsent(region, () => []).add(park);
     }
 
-    // 지역별로 출력
+    // 지역별로 간소화된 형식으로 출력
     for (var entry in groupedParks.entries) {
-      buffer.writeln('## ${entry.key} (${entry.value.length}개)');
-
-      for (int i = 0; i < entry.value.length; i++) {
-        final park = entry.value[i];
-        buffer.writeln('${i + 1}. ${park.parkName}');
-
-        if (park.parkOutline.isNotEmpty) {
-          // 개요가 너무 길면 처음 100자만 사용
-          final outline = park.parkOutline.length > 100
-              ? '${park.parkOutline.substring(0, 100)}...'
-              : park.parkOutline;
-          buffer.writeln('   📝 개요: $outline');
-        }
-
-        buffer.writeln('   📍 주소: ${park.parkAddress}');
-        buffer.writeln('   🗺️ 좌표: 위도 ${park.latitude}, 경도 ${park.longitude}');
-
-        if (park.area.isNotEmpty) {
-          buffer.writeln('   📏 면적: ${park.area}');
-        }
-
-        if (park.mainFacility.isNotEmpty) {
-          // 주요시설이 너무 길면 처음 80자만 사용
-          final facilities = park.mainFacility.length > 80
-              ? '${park.mainFacility.substring(0, 80)}...'
-              : park.mainFacility;
-          buffer.writeln('   🏢 주요시설: $facilities');
-        }
-
-        if (park.telNo.isNotEmpty) {
-          buffer.writeln('   📞 전화: ${park.telNo}');
-        }
-
-        buffer.writeln();
+      buffer.writeln('## ${entry.key}');
+      for (var park in entry.value) {
+        // 핵심 정보만: 이름 | 주소(구) | 좌표
+        final address = park.parkAddress.split(' ').take(2).join(' '); // 시구만
+        buffer.writeln('- ${park.parkName} | $address | 위도:${park.latitude},경도:${park.longitude}');
       }
+      buffer.writeln();
     }
 
     return buffer.toString();
   }
 
-  /// 문화 공간 정보 데이터 포맷팅
+  /// 문화 공간 정보 데이터 포맷팅 (토큰 절약: 간소화)
   static String _formatCulturalSpace(List<CulturalSpace> spaces) {
     if (spaces.isEmpty) {
       return '현재 문화 공간 정보를 불러올 수 없습니다.';
@@ -573,35 +528,15 @@ $weatherSummary
       groupedSpaces.putIfAbsent(category, () => []).add(space);
     }
 
-    // 카테고리별로 출력
+    // 카테고리별로 간소화된 형식으로 출력
     for (var entry in groupedSpaces.entries) {
-      buffer.writeln('## ${entry.key} (${entry.value.length}개)');
-
-      for (int i = 0; i < entry.value.length; i++) {
-        final space = entry.value[i];
-        buffer.writeln('${i + 1}. ${space.facilityName}');
-
-        buffer.writeln('   📍 주소: ${space.address} (${space.district})');
-        buffer.writeln('   🗺️ 좌표: 위도 ${space.latitude}, 경도 ${space.longitude}');
-
-        if (space.entranceFree != null && space.entranceFree!.isNotEmpty) {
-          buffer.writeln('   💰 ${space.entranceFree}');
-        }
-
-        if (space.closeDay != null && space.closeDay!.isNotEmpty) {
-          buffer.writeln('   🚫 휴무: ${space.closeDay}');
-        }
-
-        if (space.phone.isNotEmpty) {
-          buffer.writeln('   📞 전화: ${space.phone}');
-        }
-
-        if (space.homepage != null && space.homepage!.isNotEmpty) {
-          buffer.writeln('   🌐 홈페이지: ${space.homepage}');
-        }
-
-        buffer.writeln();
+      buffer.writeln('## ${entry.key}');
+      for (var space in entry.value) {
+        // 핵심 정보만: 이름 | 구 | 요금 | 좌표
+        final fee = space.entranceFree ?? '정보없음';
+        buffer.writeln('- ${space.facilityName} | ${space.district} | $fee | 위도:${space.latitude},경도:${space.longitude}');
       }
+      buffer.writeln();
     }
 
     return buffer.toString();
