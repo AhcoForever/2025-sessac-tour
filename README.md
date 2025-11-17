@@ -1,5 +1,19 @@
 # 🎵 SOFE BEAT (소프비트)
-> 흘러가는 하루를 소리로 담다 - AI 기반 차세대 공공여가 서비스
+
+<div align="center">
+
+### 🤖 AI와 함께하는 서울 365 챌린지
+### 📍 GPS로 동행하고, 🎵 음악으로 기록하는 공공여가 플랫폼
+
+**AI 캐릭터가 대화로 오늘의 활동을 추천하고,**
+**이동 중 길을 안내하며,**
+**사진·환경음·걸음 리듬을 담아 음악을 생성합니다.**
+
+> 서울시 365 챌린지를 AI 기술로 확장한 차세대 공공여가 서비스
+
+</div>
+
+---
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.35.2-02569B?logo=flutter)](https://flutter.dev)
 [![Firebase](https://img.shields.io/badge/Firebase-Backend-FFCA28?logo=firebase)](https://firebase.google.com)
@@ -361,9 +375,6 @@ flutter run -d android
 
 # iOS
 flutter run -d ios
-
-# 웹 (개발 모드)
-flutter run -d chrome
 ```
 
 ### 빌드
@@ -374,9 +385,6 @@ flutter build apk --release
 
 # iOS
 flutter build ios --release
-
-# 웹
-flutter build web
 ```
 
 ---
@@ -432,7 +440,6 @@ flutter build web
 - 🏙️ 다른 도시로 서비스 확장
 - 🤖 AI 모델 고도화 (Fine-tuning, 개인화 강화)
 - 🎨 창작 도구 추가 (음악 편집, 리믹스 등)
-- 🌐 웹 버전 출시
 - 🎯 서울페이 포인트 연동
 
 ---
