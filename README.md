@@ -3,7 +3,7 @@
 <div align="center">
   <img src="./assets/icons/SOFE-logo.png" width="200" height="200" alt="SOFE Logo">
 
-**당신의 감정에 귀 기울이는 AI 일상 가이드**
+**소프, 음악으로 기록하는 나의 하루!**
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.5.0-blue?logo=flutter)](https://flutter.dev)
 [![Claude API](https://img.shields.io/badge/Claude-API-orange?logo=anthropic)](https://anthropic.com)
@@ -18,7 +18,7 @@
 
 **"오늘 기분이 어때?"**
 
-SOFE는 사용자의 감정을 AI가 실시간으로 분석하여, 서울의 365개 도전과제와 연계한 맞춤형 일상 루틴을 추천하는 감정 기반 AI 웰니스 서비스입니다.
+SOFE는 사용자의 감정을 AI가 실시간으로 분석하여, 서울의 365 챌린지와 연계한 맞춤형 일상 루틴을 추천하는 감정 기반 AI 웰니스 서비스입니다.
 
 ### 🎯 목표
 - 도시 생활자의 감정적 웰빙 증진
