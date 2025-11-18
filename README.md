@@ -9,7 +9,7 @@
 [![Claude API](https://img.shields.io/badge/Claude-API-orange?logo=anthropic)](https://anthropic.com)
 [![Firebase](https://img.shields.io/badge/Firebase-Latest-yellow?logo=firebase)](https://firebase.google.com)
 
-[📱 Demo Video]() | [📊 Presentation]() | [🎯 Seoul 365 Challenge](https://sihsc.welfare.seoul.kr/letsdoseoul/main.do)
+[📱 Demo Video]() | [🎯 Seoul 365 Challenge](https://sihsc.welfare.seoul.kr/letsdoseoul/main.do)
 </div>
 
 ---
@@ -137,6 +137,69 @@ SOFE는 사용자의 감정을 AI가 실시간으로 분석하여, 서울의 365
 
 ---
 
+## 데이터 출처 및 라이선스 (Data Sources & Licenses)
+
+### 공공데이터 (Public Data)
+1. **서울시 문화행사 정보**
+  - 출처: 서울 열린데이터광장 (data.seoul.go.kr)
+  - 라이선스: 공공누리1유형 (상업적 이용 및 변경 가능)
+  - 인증키: data.seoul.go.kr에서 발급
+  - 문서: https://data.seoul.go.kr/dataList/OA-15486/S/1/datasetView.do
+
+2. **서울시 야경명소 정보**
+  - 출처 : 서울 열린데이터 광장 (data.seoul.go.kr)
+  - 라이선스 : 공공누리1유형 (상업적 이용 및 변경 가능)
+  - 인증키 : data.seoul.go.kr에서 발급
+  - 문서 : https://data.seoul.go.kr/dataList/OA-22579/S/1/datasetView.do
+
+3. **서울시 주요 공원 현황**
+  - 출처 : 서울 열린데이터 광장 (data.seoul.go.kr)
+  - 라이선스 : 공공누리1유형 (상업적 이용 및 변경 가능)
+  - 인증키 : data.seoul.go.kr에서 발급
+  - 문서 : https://data.seoul.go.kr/dataList/OA-394/S/1/datasetView.do
+
+4. **서울시 문화공간 정보**
+  - 출처 : 서울 열린데이터 광장 (data.seoul.go.kr)
+  - 라이선스 : 공공누리1유형 (상업적 이용 및 변경 가능)
+  - 인증키 : data.seoul.go.kr에서 발급
+  - 문서 : https://data.seoul.go.kr/dataList/OA-15487/S/1/datasetView.do
+
+5. **VisitSeoul**
+  - 출처 : 서울관광재단 (https://api.visitseoul.net/main/home)
+  - 라이선스 : 서울관광재단 이용약관 준수
+  - Attribution : VisitSeoul 또는 서울관광재단 표기 권장
+  - 인증키 : https://api.visitseoul.net/main/home 에서 발급
+  - 용도 : 관광지, 행사, 맛집 정보 제공
+  - 문서 : https://api.visitseoul.net/apiinfo/apilist/view/1?lang=ko
+
+6. **중기예보 조회서비스**
+  - 제공기관 : 기상청 (Korea Meterological Administration)
+  - 출처 : 공공데이터포털 (https://www.data.go.kr)
+  - 라이선스 : CC라이선스 (비영리,변경금지)
+  - 인증키 : https://www.data.go.kr 에서 발급
+  - 문서 : https://www.data.go.kr/data/15059468/openapi.do
+
+### 상용 API (Commercial APIs)
+1. **Google Maps Platform**
+  - 제공 : Google Cloud Console
+  - 용도 : 지도 표시
+  - 문서 : https://developers.google.com/maps
+  - Attribution : "Google data ©2025 Google"
+
+2. **Claude API**
+  - 제공 : Anthropic
+  - 용도 : AI 대화 기능
+  - 문서 : https://docs.anthropic.com
+
+### 오픈소스 라이브러리 / Open Source Libraries
+- `http: ^1.6.0` (MIT License)
+- `dio: ^5.9.0` (MIT License)
+- `google_maps_flutter: ^2.5.0` (Apache 2.0)
+- `envied: ^0.5.0` (MIT License)
+
+전체 의존성 목록은 `pubspec.yaml` 참조
+
+---
 ## 🏗 시스템 아키텍처
 ```mermaid
 graph TD
@@ -205,12 +268,12 @@ class PromptBuilder {
 
 ### Team SOFE
 
-| 역할 | 이름                                     | 담당 업무 |
-|------|----------------------------------------|-----------|
-| 🎯 **팀장/개발** | [김민영](https://github.com/AhcoForever)  | Flutter 개발, AI 통합, 시스템 설계 |
-| 📋 **기획** | [김수현] (https://github.com/artishk52) | 서비스 기획, UX 설계, 프로젝트 관리 |
-| 🎨 **디자인** | [소아연] (https://github.com/ayeoniiii) | UI/UX 디자인, 브랜딩 |
-| 🔍 **리서치** | [유승화] (https://github.com/9121awh) | 데이터 분석, 사용자 조사, API 연구 |
+| 역할 | 이름                                  | 담당 업무 |
+|------|-------------------------------------|-----------|
+| 🎯 **팀장/개발** | [김민영](https://github.com/AhcoForever) | Flutter 개발, AI 통합, 시스템 설계 |
+| 📋 **기획** | [김수현](https://github.com/artishk52) | 서비스 기획, UX 설계, 프로젝트 관리 |
+| 🎨 **디자인** | [소아연](https://github.com/ayeoniiii) | UI/UX 디자인, 브랜딩 |
+| 🔍 **리서치** | [유승화](https://github.com/9121awh) | 데이터 분석, 사용자 조사, API 연구 |
 
 ---
 
