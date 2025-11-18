@@ -2,12 +2,13 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../../core/config.dart';
 import '../models/content_info.dart';
 import '../models/content_list_item.dart';
 
 class VisitSeoulApiService{
-  // api 키 입력 : VisitSeoul
-  static String _apiKey = 'a067e1f9-09aa-4705-beb7-96f702a24fa9';
+  // api 키는 config.dart에서 관리
+  static String _apiKey = AppConfig.visitSeoulApiKey;
   static String _baseUrl = 'https://api-call.visitseoul.net';
 
   Future<ContentInfo?> getContentInfo(String cid) async {

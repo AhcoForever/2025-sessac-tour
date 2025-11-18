@@ -1,14 +1,15 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../../../core/config.dart';
 import '../models/cultural_event.dart';
 import '../models/night_spot.dart';
 import '../models/park_info.dart';
 import '../models/cultural_space.dart';
 
 class SeoulApiService {
-  // API 키 입력 :  서울데이터광장
-  static const String _apiKey = '4251624b766168633131377670674970';
+  // API 키는 config.dart에서 관리
+  static const String _apiKey = AppConfig.seoulOpenApiKey;
   static const String _baseUrl = 'http://openapi.seoul.go.kr:8088';
 
   // 문화행사 정보 20개 가져오기
