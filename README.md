@@ -205,12 +205,12 @@ class PromptBuilder {
 
 ### Team SOFE
 
-| 역할 | 이름                                     | 담당 업무 |
-|------|----------------------------------------|-----------|
-| 🎯 **팀장/개발** | [김민영](https://github.com/AhcoForever)  | Flutter 개발, AI 통합, 시스템 설계 |
-| 📋 **기획** | [김수현] (https://github.com/artishk52) | 서비스 기획, UX 설계, 프로젝트 관리 |
-| 🎨 **디자인** | [소아연] (https://github.com/ayeoniiii) | UI/UX 디자인, 브랜딩 |
-| 🔍 **리서치** | [유승화] (https://github.com/9121awh) | 데이터 분석, 사용자 조사, API 연구 |
+| 역할 | 이름                                  | 담당 업무 |
+|------|-------------------------------------|-----------|
+| 🎯 **팀장/개발** | [김민영](https://github.com/AhcoForever) | Flutter 개발, AI 통합, 시스템 설계 |
+| 📋 **기획** | [김수현](https://github.com/artishk52) | 서비스 기획, UX 설계, 프로젝트 관리 |
+| 🎨 **디자인** | [소아연](https://github.com/ayeoniiii) | UI/UX 디자인, 브랜딩 |
+| 🔍 **리서치** | [유승화](https://github.com/9121awh) | 데이터 분석, 사용자 조사, API 연구 |
 
 ---
 
