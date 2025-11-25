@@ -9,7 +9,7 @@
 [![Claude API](https://img.shields.io/badge/Claude-API-orange?logo=anthropic)](https://anthropic.com)
 [![Firebase](https://img.shields.io/badge/Firebase-Latest-yellow?logo=firebase)](https://firebase.google.com)
 
-[📱 Demo Video]() | [🎯 Seoul 365 Challenge](https://sihsc.welfare.seoul.kr/letsdoseoul/main.do)
+[📱 Demo Video](https://www.youtube.com/watch?v=q9CnQToewwg) | [🎯 Seoul 365 Challenge](https://sihsc.welfare.seoul.kr/letsdoseoul/main.do)
 </div>
 
 ---
@@ -220,57 +220,6 @@ graph TD
     B --> N[지도 서비스]
     N --> O[Google Maps]
     N --> P[Kakao Directions]
-```
-
-## 데이터 파이프라인 다이어그램
-```mermaid
-graph LR
-    subgraph "입력 데이터"
-        UserInput[사용자 입력<br/>감정·선호]
-        Sensors[센서 데이터<br/>GPS·걸음]
-        Media[미디어<br/>환경음·사진]
-    end
-    
-    subgraph "데이터 처리"
-        UserInput --> Claude1[Claude AI<br/>자연어 처리]
-        
-        Sensors --> GeoProcess[위치 데이터<br/>처리]
-        Sensors --> MotionProcess[모션 데이터<br/>처리]
-        
-        Media --> AudioProcess[오디오<br/>메타데이터 추출]
-        Media --> ImageProcess[이미지<br/>분석]
-    end
-    
-    subgraph "데이터 통합"
-        Claude1 --> Integrator[멀티모달<br/>통합 엔진]
-        GeoProcess --> Integrator
-        MotionProcess --> Integrator
-        AudioProcess --> Integrator
-        ImageProcess --> Integrator
-        
-        PublicData[공공데이터<br/>실시간 fetch] --> Integrator
-    end
-    
-    subgraph "AI 생성"
-        Integrator --> ClaudePrompt[Claude<br/>프롬프트 생성]
-        ClaudePrompt --> MusicGen[MusicGen<br/>음악 생성]
-    end
-    
-    subgraph "출력 데이터"
-        MusicGen --> MusicFile[음악 파일<br/>MP3]
-        MusicGen --> Metadata[메타데이터<br/>장르·무드·BPM]
-        MusicFile --> FirebaseStorage[(Cloud Storage)]
-        Metadata --> Firestore[(Firestore)]
-    end
-    
-    subgraph "인증 & 보상"
-        Firestore --> AuthSystem[인증 시스템<br/>GPS + 활동 검증]
-        AuthSystem --> Points[포인트 적립<br/>서울페이 연동]
-    end
-    
-    style Integrator fill:#DDA0DD
-    style MusicGen fill:#4ECDC4
-    style AuthSystem fill:#98FB98
 ```
 
 ---
