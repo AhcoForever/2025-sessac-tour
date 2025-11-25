@@ -81,17 +81,44 @@ class _AiChatPageState extends State<AiChatPage> {
 
   /// 초기 데이터 로드
   Future<void> _loadInitialData() async {
-    // 캐릭터 로드
-    await _characterManager.loadCharacter();
+    try {
+      // 캐릭터 로드
+      await _characterManager.loadCharacter();
 
-    // 환영 메시지 추가
-    final welcomeMessage = _characterManager.getWelcomeMessage();
-    _messageHandler.addWelcomeMessage(welcomeMessage);
+      // 환영 메시지 추가
+      final welcomeMessage = _characterManager.getWelcomeMessage();
+      _messageHandler.addWelcomeMessage(welcomeMessage);
 
-    // 데이터 로드
-    await _dataFetchManager.loadAllData();
+      // 데이터 로드
+      await _dataFetchManager.loadAllData();
 
-    if (mounted) setState(() {});
+      if (mounted) setState(() {});
+    } catch (e) {
+      print('❌ 초기 데이터 로드 실패: $e');
+
+      // 사용자에게 에러 알림
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('데이터를 불러오는데 실패했습니다. 다시 시도해주세요.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            action: SnackBarAction(
+              label: '재시도',
+              textColor: Colors.white,
+              onPressed: () => _loadInitialData(),
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+
+        // 기본 환영 메시지라도 추가
+        if (_messageHandler.messages.isEmpty) {
+          _messageHandler.addWelcomeMessage('안녕하세요! 데이터 로드 중 문제가 발생했지만 대화는 가능합니다.');
+        }
+
+        setState(() {});
+      }
+    }
   }
 
   @override
