@@ -66,64 +66,120 @@ class KakaoDirectionsService {
       if (response.statusCode == 200) {
         final data = json.decode(utf8.decode(response.bodyBytes));
 
+        // 디버깅: API 응답 전체 출력
+        debugPrint('📍 Kakao API 응답: ${json.encode(data)}');
+
         // Kakao API는 routes 배열로 응답합니다
         if (data['routes'] != null && (data['routes'] as List).isNotEmpty) {
           return _parseDirectionsResponse(data);
         } else {
           debugPrint('❌ Kakao Directions: 경로가 없습니다');
+          debugPrint('   응답 데이터: $data');
           return null;
         }
       } else if (response.statusCode == 401) {
         debugPrint('❌ Kakao Directions: 인증 실패 (API 키 확인 필요)');
+        debugPrint('   응답: ${response.body}');
         return null;
       } else {
         debugPrint('❌ Kakao Directions: 경로 조회 실패 (${response.statusCode})');
+        debugPrint('   응답: ${response.body}');
         return null;
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('❌ 경로 조회 에러: $e');
+      debugPrint('   스택 트레이스: $stackTrace');
       return null;
     }
   }
 
   /// Kakao Mobility Directions API 응답 파싱
-  RouteInfo _parseDirectionsResponse(Map<String, dynamic> data) {
-    final routes = data['routes'] as List;
-    final route = routes[0] as Map<String, dynamic>;
+  RouteInfo? _parseDirectionsResponse(Map<String, dynamic> data) {
+    try {
+      final routes = data['routes'] as List?;
+      if (routes == null || routes.isEmpty) {
+        debugPrint('❌ routes 배열이 비어있습니다');
+        return null;
+      }
 
-    // 경로 요약 정보
-    final summary = route['summary'] as Map<String, dynamic>;
-    final distance = summary['distance'] as int; // 미터 단위
-    final duration = summary['duration'] as int; // 초 단위
+      final route = routes[0] as Map<String, dynamic>?;
+      if (route == null) {
+        debugPrint('❌ route 데이터가 null입니다');
+        return null;
+      }
 
-    // 경로 좌표 추출
-    final List<LatLng> path = [];
-    final sections = route['sections'] as List;
+      // 경로 요약 정보
+      final summary = route['summary'] as Map<String, dynamic>?;
+      if (summary == null) {
+        debugPrint('❌ summary 데이터가 null입니다');
+        return null;
+      }
 
-    for (var section in sections) {
-      final roads = section['roads'] as List;
-      for (var road in roads) {
-        // vertexes는 [경도1, 위도1, 경도2, 위도2, ...] 형식의 1차원 배열
-        final vertexes = road['vertexes'] as List;
-        for (int i = 0; i < vertexes.length; i += 2) {
-          final longitude = (vertexes[i] as num).toDouble();
-          final latitude = (vertexes[i + 1] as num).toDouble();
-          path.add(LatLng(latitude, longitude));
+      final distance = summary['distance'] as int?;
+      final duration = summary['duration'] as int?;
+
+      if (distance == null || duration == null) {
+        debugPrint('❌ distance 또는 duration이 null입니다');
+        return null;
+      }
+
+      // 경로 좌표 추출
+      final List<LatLng> path = [];
+      final sections = route['sections'] as List?;
+
+      if (sections != null && sections.isNotEmpty) {
+        for (var section in sections) {
+          final sectionMap = section as Map<String, dynamic>?;
+          if (sectionMap == null) continue;
+
+          final roads = sectionMap['roads'] as List?;
+          if (roads == null) continue;
+
+          for (var road in roads) {
+            final roadMap = road as Map<String, dynamic>?;
+            if (roadMap == null) continue;
+
+            // vertexes는 [경도1, 위도1, 경도2, 위도2, ...] 형식의 1차원 배열
+            final vertexes = roadMap['vertexes'] as List?;
+            if (vertexes == null || vertexes.isEmpty) continue;
+
+            for (int i = 0; i < vertexes.length - 1; i += 2) {
+              try {
+                final longitude = (vertexes[i] as num).toDouble();
+                final latitude = (vertexes[i + 1] as num).toDouble();
+                path.add(LatLng(latitude, longitude));
+              } catch (e) {
+                debugPrint('⚠️ 좌표 파싱 실패: $e');
+                continue;
+              }
+            }
+          }
         }
       }
+
+      if (path.isEmpty) {
+        debugPrint('❌ 경로 좌표가 비어있습니다');
+        return null;
+      }
+
+      // 경로 요약 생성
+      final distanceKm = (distance / 1000).toStringAsFixed(1);
+      final durationMin = (duration / 60).round();
+      final summaryText = '경로 (${distanceKm}km, 약 $durationMin분)';
+
+      debugPrint('✅ 경로 파싱 성공: $summaryText, 좌표 ${path.length}개');
+
+      return RouteInfo(
+        path: path,
+        distance: distance,
+        duration: duration * 1000, // 밀리초로 변환
+        summary: summaryText,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('❌ 경로 응답 파싱 에러: $e');
+      debugPrint('   스택 트레이스: $stackTrace');
+      return null;
     }
-
-    // 경로 요약 생성
-    final distanceKm = (distance / 1000).toStringAsFixed(1);
-    final durationMin = (duration / 60).round();
-    final summaryText = '경로 (${distanceKm}km, 약 $durationMin분)';
-
-    return RouteInfo(
-      path: path,
-      distance: distance,
-      duration: duration * 1000, // 밀리초로 변환
-      summary: summaryText,
-    );
   }
 
   /// 거리 계산 (간단한 직선거리)

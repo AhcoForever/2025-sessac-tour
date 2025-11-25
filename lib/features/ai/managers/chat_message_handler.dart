@@ -10,6 +10,10 @@ class ChatMessageHandler {
 
   bool _isLoading = false;
 
+  // 상수 정의
+  static const int maxMessageCount = 100; // 최대 메시지 개수 (메모리 누수 방지)
+  static const int recentMessageLimit = 10; // API 전송 시 최근 메시지 제한
+
   // Getters
   bool get isLoading => _isLoading;
   int get messageCount => messages.length;
@@ -24,6 +28,25 @@ class ChatMessageHandler {
   /// 사용자 메시지 추가
   void addUserMessage(String text) {
     messages.add(ChatMessage.user(text));
+    _trimMessagesIfNeeded();
+  }
+
+  /// 메시지 개수 제한 (메모리 누수 방지)
+  /// 최대 개수를 넘으면 오래된 메시지부터 삭제 (환영 메시지는 유지)
+  void _trimMessagesIfNeeded() {
+    if (messages.length > maxMessageCount) {
+      final welcomeMessage = messages.firstOrNull;
+      final excessCount = messages.length - maxMessageCount;
+
+      // 환영 메시지가 있으면 두 번째 메시지부터 삭제
+      if (welcomeMessage != null) {
+        messages.removeRange(1, 1 + excessCount);
+        print('📝 메시지 정리: ${excessCount}개 삭제 (현재: ${messages.length}개)');
+      } else {
+        messages.removeRange(0, excessCount);
+        print('📝 메시지 정리: ${excessCount}개 삭제 (현재: ${messages.length}개)');
+      }
+    }
   }
 
   /// 메시지 전송 (스트리밍)
@@ -46,13 +69,13 @@ class ChatMessageHandler {
     String accumulatedText = '';
 
     try {
-      // 토큰 절약: 최근 10개 메시지만 전송 (5턴 대화)
+      // 토큰 절약: 최근 N개 메시지만 전송
       final messagesToSend = messages.where((msg) => msg != assistantMessage).toList();
-      final recentMessages = messagesToSend.length > 10
-          ? messagesToSend.sublist(messagesToSend.length - 10)
+      final recentMessages = messagesToSend.length > recentMessageLimit
+          ? messagesToSend.sublist(messagesToSend.length - recentMessageLimit)
           : messagesToSend;
 
-      print('💬 메시지 전송: ${messagesToSend.length}개 → ${recentMessages.length}개 (최근 10개로 제한)');
+      print('💬 메시지 전송: ${messagesToSend.length}개 → ${recentMessages.length}개 (최근 ${recentMessageLimit}개로 제한)');
 
       // Claude API 스트리밍 호출
       final stream = claudeService.sendMessageStream(

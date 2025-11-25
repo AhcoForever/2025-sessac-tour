@@ -286,7 +286,10 @@ class _MapPageState extends State<MapPage> {
 
     final currentPosition = _locationTracker.currentPosition;
     if (currentPosition != null) {
-      _markerManager.updateMarkerScreenPosition(currentPosition);
+      // 화면 좌표 업데이트 후 UI 갱신
+      _markerManager.updateMarkerScreenPosition(currentPosition).then((_) {
+        if (mounted) setState(() {});
+      });
     }
 
     // 줌 레벨 변화 처리
