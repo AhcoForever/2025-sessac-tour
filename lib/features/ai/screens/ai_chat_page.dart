@@ -1,24 +1,11 @@
-import 'dart:convert';
-import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:geolocator/geolocator.dart';
 import '../../../core/config.dart';
-import '../../public_data/models/cultural_event.dart';
-import '../../public_data/models/content_list_item.dart';
-import '../../public_data/models/park_info.dart';
-import '../../public_data/models/cultural_space.dart';
-import '../../public_data/services/seoulapi_service.dart';
-import '../../public_data/services/visitseoul_api_service.dart';
-import '../../public_data/services/weather_api_service.dart';
-import '../../map/services/location_service.dart';
-import '../models/chat_message.dart';
-import '../models/chracter.dart';
-import '../models/recommendation.dart';
+import '../managers/data_fetch_manager.dart';
+import '../managers/chat_message_handler.dart';
+import '../managers/chat_profile_manager.dart';
+import '../managers/character_manager.dart';
 import '../services/claude_service.dart';
-import '../services/character_storage_service.dart';
-import '../services/prompt_builder.dart';
-import '../services/chat_profile_service.dart';
 import 'widgets/message_bubble.dart';
 
 class AiChatPage extends StatefulWidget {
@@ -31,29 +18,14 @@ class AiChatPage extends StatefulWidget {
 class _AiChatPageState extends State<AiChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<ChatMessage> _messages = [];
 
-  late ClaudeService _claudeService;
-  final SeoulApiService _seoulApiService = SeoulApiService();
-  final VisitSeoulApiService _visitSeoulApiService = VisitSeoulApiService();
-  final WeatherApiService _weatherApiService = WeatherApiService();
-  final LocationService _locationService = LocationService();
-  final ChatProfileService _chatProfileService = ChatProfileService();
+  // Managers
+  late final DataFetchManager _dataFetchManager;
+  late final ChatMessageHandler _messageHandler;
+  final ChatProfileManager _profileManager = ChatProfileManager();
+  final CharacterManager _characterManager = CharacterManager();
 
-  bool _isLoading = false;
-  bool _isLoadingData = true; // 데이터 로딩 중
-  List<CulturalEvent> _culturalEvents = [];
-  List<ContentListItem> _tourContents = [];
-  List<ParkInfo> _parkInfos = [];
-  List<CulturalSpace> _culturalSpaces = [];
-  String? _weatherSummary; // 날씨 예보 요약
-  Character? _selectedCharacter; // 선택된 캐릭터
-  String? _selectedCategory; // 선택된 카테고리
-  Position? _currentPosition; // 현재 위치
-  String? _currentLocation; // 현재 위치 설명 (예: "강남구")
-
-  // 토큰 절약: 위치 기반 필터링 반경 (미터)
-  static const double _filterRadiusMeters = 5000; // 5km
+  String? _selectedCategory;
 
   // 카테고리별 예시 질문
   final Map<String, List<String>> _exampleQuestions = {
@@ -89,269 +61,37 @@ class _AiChatPageState extends State<AiChatPage> {
     ],
   };
 
-  // 🎯 시스템 프롬프트 생성 (PromptBuilder 사용)
-  String get _systemPrompt {
-    return PromptBuilder.buildSystemPrompt(
-      character: _selectedCharacter,
-      culturalEvents: _culturalEvents,
-      tourContents: _tourContents,
-      parkInfos: _parkInfos,
-      culturalSpaces: _culturalSpaces,
-      currentLocation: _currentLocation,
-      weatherSummary: _weatherSummary,
-    );
-  }
-
   @override
   void initState() {
     super.initState();
-    // AppConfig에서 API 키를 가져옵니다
-    _claudeService = ClaudeService(
+    _initializeManagers();
+    _loadInitialData();
+  }
+
+  /// 매니저 초기화
+  void _initializeManagers() {
+    _dataFetchManager = DataFetchManager();
+
+    final claudeService = ClaudeService(
       apiKey: AppConfig.claudeApiKey,
       model: AppConfig.claudeModel,
     );
-
-    // 저장된 캐릭터 불러오기
-    _loadCharacter();
-
-    // 서울시 문화행사 데이터 로드
-    _loadCulturalEvents();
-    // VisitSeoul 관광 콘텐츠 데이터 로드
-    _loadTourContents();
-    // 서울시 공원 정보 데이터 로드
-    _loadParkInfo();
-    // 서울시 문화 공간 정보 데이터 로드
-    _loadCulturalSpace();
-    // 위치 정보 로드
-    _loadLocation();
-    // 날씨 예보 정보 로드
-    _loadWeather();
+    _messageHandler = ChatMessageHandler(claudeService: claudeService);
   }
 
-  /// 위치 정보 로드
-  Future<void> _loadLocation() async {
-    try {
-      final position = await _locationService.getCurrentLocation();
+  /// 초기 데이터 로드
+  Future<void> _loadInitialData() async {
+    // 캐릭터 로드
+    await _characterManager.loadCharacter();
 
-      if (position != null) {
-        setState(() {
-          _currentPosition = position;
-          // 간단하게 위도/경도를 저장 (추후 Geocoding으로 주소 변환 가능)
-          _currentLocation = '위도: ${position.latitude.toStringAsFixed(4)}, 경도: ${position.longitude.toStringAsFixed(4)}';
-        });
-      }
-    } catch (e) {
-      // 위치 정보 로드 실패 시 무시
-    }
-  }
+    // 환영 메시지 추가
+    final welcomeMessage = _characterManager.getWelcomeMessage();
+    _messageHandler.addWelcomeMessage(welcomeMessage);
 
-  /// 저장된 캐릭터 불러오기
-  Future<void> _loadCharacter() async {
-    final character = await CharacterStorageService.loadCharacter();
-    setState(() {
-      _selectedCharacter = character;
-    });
+    // 데이터 로드
+    await _dataFetchManager.loadAllData();
 
-    // 초기 환영 메시지 (캐릭터별로)
-    String welcomeMessage;
-    if (_selectedCharacter != null) {
-      welcomeMessage = _getWelcomeMessage(_selectedCharacter!);
-    } else {
-      welcomeMessage =
-          '안녕. 나는 소울해치야. 오늘 너의 기분을 센싱해서 서울의 하루를 예쁘게 디자인해줄게. 지금 기분은 어때?';
-    }
-
-    _messages.add(ChatMessage.assistant(welcomeMessage));
-  }
-
-  /// 캐릭터별 환영 메시지 생성
-  String _getWelcomeMessage(Character character) {
-    switch (character.id) {
-      case 'haetchi':
-        return '안녕. 나는 ${character.name}야. 오늘 너의 기분을 센싱해서 서울의 하루를 예쁘게 디자인해줄게. 지금 기분은 어때?';
-      case 'cheongryong':
-        return '안녕! 나는 ${character.name}이용! 오늘 어디 갈까용? 재미있는 곳 찾아줄게용!';
-      case 'baekho':
-        return '어이! 나는 ${character.name}야. 서울 구석구석 다 아는 나랑 같이 돌아다녀보자고! 어디 가고 싶은 데 있어?';
-      default:
-        return '안녕! 나는 ${character.name}이야. 서울에서 너가 하루를 알차게 보내도록 도와줄게!';
-    }
-  }
-
-  /// 서울시 문화행사 데이터 로드 (RAG)
-  Future<void> _loadCulturalEvents() async {
-    setState(() {
-      _isLoadingData = true;
-    });
-
-    try {
-      // 서울시 문화행사 20개 가져오기 (토큰 절약)
-      final events = await _seoulApiService.getCulturalEvent(
-        startIndex: 1,
-        endIndex: 20,
-      );
-
-      setState(() {
-        _culturalEvents = events;
-        _isLoadingData = false;
-      });
-
-      print('✅ 문화행사 ${events.length}개 로드 완료');
-    } catch (e) {
-      print('❌ 문화행사 로드 실패: $e');
-      setState(() {
-        _culturalEvents = [];
-        _isLoadingData = false;
-      });
-    }
-  }
-
-  /// VisitSeoul 관광 콘텐츠 데이터 로드 (RAG)
-  Future<void> _loadTourContents() async {
-    try {
-      // VisitSeoul 관광 콘텐츠 20개 가져오기 (토큰 절약)
-      final response = await _visitSeoulApiService.getContentList(
-        langCodeId: 'ko',
-        sortType: 'latest',
-        pageNo: 1,
-      );
-
-      if (response != null) {
-        // 진행 중인 콘텐츠만 필터링 (토큰 절약: 20개로 제한)
-        final ongoingContents = response.data
-            .where((content) => content.isOngoing())
-            .take(20)
-            .toList();
-
-        setState(() {
-          _tourContents = ongoingContents;
-        });
-
-        print('✅ 관광 콘텐츠 ${ongoingContents.length}개 로드 완료');
-      }
-    } catch (e) {
-      print('❌ 관광 콘텐츠 로드 실패: $e');
-      setState(() {
-        _tourContents = [];
-      });
-    }
-  }
-
-  /// 서울시 공원 정보 데이터 로드 (RAG)
-  Future<void> _loadParkInfo() async {
-    try {
-      // 서울시 공원 정보 20개 가져오기 (토큰 절약)
-      final response = await _seoulApiService.getParkInfo(
-        startIndex: 1,
-        endIndex: 20,
-      );
-
-      if (response != null && response.result.isSuccess) {
-        // 위치 기반 필터링 (5km 이내)
-        List<ParkInfo> filteredParks = response.row;
-
-        if (_currentPosition != null) {
-          filteredParks = response.row.where((park) {
-            try {
-              // 좌표를 String에서 double로 파싱
-              final parkLat = double.parse(park.latitude);
-              final parkLng = double.parse(park.longitude);
-
-              final distance = Geolocator.distanceBetween(
-                _currentPosition!.latitude,
-                _currentPosition!.longitude,
-                parkLat,
-                parkLng,
-              );
-              return distance <= _filterRadiusMeters;
-            } catch (e) {
-              return true; // 좌표 파싱 실패 시 포함
-            }
-          }).toList();
-
-          print('📍 공원 필터링: ${response.row.length}개 → ${filteredParks.length}개 (5km 이내)');
-        }
-
-        setState(() {
-          _parkInfos = filteredParks;
-        });
-
-        print('✅ 공원 정보 ${filteredParks.length}개 로드 완료');
-      }
-    } catch (e) {
-      print('❌ 공원 정보 로드 실패: $e');
-      setState(() {
-        _parkInfos = [];
-      });
-    }
-  }
-
-  /// 서울시 문화 공간 정보 데이터 로드 (RAG)
-  Future<void> _loadCulturalSpace() async {
-    try {
-      // 서울시 문화 공간 정보 20개 가져오기 (토큰 절약)
-      final response = await _seoulApiService.getCulturalSpace(
-        startIndex: 1,
-        endIndex: 20,
-      );
-
-      if (response != null && response.result.isSuccess) {
-        // 위치 기반 필터링 (5km 이내)
-        List<CulturalSpace> filteredSpaces = response.row;
-
-        if (_currentPosition != null) {
-          filteredSpaces = response.row.where((space) {
-            try {
-              // 좌표를 String에서 double로 파싱
-              final spaceLat = double.parse(space.latitude);
-              final spaceLng = double.parse(space.longitude);
-
-              final distance = Geolocator.distanceBetween(
-                _currentPosition!.latitude,
-                _currentPosition!.longitude,
-                spaceLat,
-                spaceLng,
-              );
-              return distance <= _filterRadiusMeters;
-            } catch (e) {
-              return true; // 좌표 파싱 실패 시 포함
-            }
-          }).toList();
-
-          print('📍 문화공간 필터링: ${response.row.length}개 → ${filteredSpaces.length}개 (5km 이내)');
-        }
-
-        setState(() {
-          _culturalSpaces = filteredSpaces;
-        });
-
-        print('✅ 문화 공간 정보 ${filteredSpaces.length}개 로드 완료');
-      }
-    } catch (e) {
-      print('❌ 문화 공간 정보 로드 실패: $e');
-      setState(() {
-        _culturalSpaces = [];
-      });
-    }
-  }
-
-  /// 기상청 중기예보 정보 로드 (RAG)
-  Future<void> _loadWeather() async {
-    try {
-      // 기상청 중기예보 조회
-      final summary = await _weatherApiService.getWeatherSummary();
-
-      setState(() {
-        _weatherSummary = summary;
-      });
-
-      print('✅ 날씨 예보 로드 완료');
-    } catch (e) {
-      print('❌ 날씨 예보 로드 실패: $e');
-      setState(() {
-        _weatherSummary = null;
-      });
-    }
+    if (mounted) setState(() {});
   }
 
   @override
@@ -361,80 +101,39 @@ class _AiChatPageState extends State<AiChatPage> {
     super.dispose();
   }
 
-  /// 메시지 전송 (SSE 스트리밍 방식)
-  Future<void> _sendMessage() async {
-    final text = _messageController.text.trim();
-    if (text.isEmpty || _isLoading) return;
+  /// 메시지 전송
+  Future<void> _sendMessage(String text) async {
+    if (text.trim().isEmpty || _messageHandler.isLoading) return;
 
-    // 사용자 메시지 추가
-    final userMessage = ChatMessage.user(text);
+    final systemPrompt = _dataFetchManager.buildSystemPrompt(
+      _characterManager.selectedCharacter,
+    );
+
     setState(() {
-      _messages.add(userMessage);
-      _isLoading = true;
+      _selectedCategory = null;
     });
 
-    _messageController.clear();
     _scrollToBottom();
 
-    // 빈 Assistant 메시지를 먼저 추가 (스트리밍으로 채워질 예정)
-    final assistantMessage = ChatMessage.assistant('');
-    setState(() {
-      _messages.add(assistantMessage);
-    });
-
-    String accumulatedText = '';
-
-    try {
-      // 토큰 절약: 최근 10개 메시지만 전송 (5턴 대화)
-      final messagesToSend = _messages.where((msg) => msg != assistantMessage).toList();
-      final recentMessages = messagesToSend.length > 10
-          ? messagesToSend.sublist(messagesToSend.length - 10)
-          : messagesToSend;
-
-      print('💬 메시지 전송: ${messagesToSend.length}개 → ${recentMessages.length}개 (최근 10개로 제한)');
-
-      // Claude API 스트리밍 호출
-      final stream = _claudeService.sendMessageStream(
-        messages: recentMessages,
-        systemPrompt: _systemPrompt,
-        maxTokens: 2048,
-      );
-
-      await for (var chunk in stream) {
-        accumulatedText += chunk;
-
-        // 실시간으로 텍스트 업데이트
-        setState(() {
-          _messages[_messages.length - 1] = ChatMessage.assistant(accumulatedText);
-        });
+    await for (final event in _messageHandler.sendMessage(
+      userMessage: text,
+      systemPrompt: systemPrompt,
+    )) {
+      if (event is MessageAdded || event is TextUpdate) {
+        setState(() {});
+        _scrollToBottom();
+      } else if (event is Completed) {
+        // 채팅 프로필 업데이트
+        await _profileManager.updateProfile(
+          characterId: _characterManager.selectedCharacter?.id,
+          recommendations: event.recommendations,
+        );
+        setState(() {});
+        _scrollToBottom();
+      } else if (event is ErrorOccurred) {
+        setState(() {});
         _scrollToBottom();
       }
-
-      // 스트리밍 완료 후 추천 데이터 파싱
-      final (textPart, recommendations) = _parseResponse(accumulatedText);
-
-      // 최종 메시지 업데이트 (추천 데이터 포함)
-      setState(() {
-        _messages[_messages.length - 1] = ChatMessage.assistant(
-          textPart,
-          recommendations: recommendations,
-        );
-        _isLoading = false;
-      });
-
-      // 채팅 프로필 업데이트
-      await _updateChatProfile(recommendations);
-
-      _scrollToBottom();
-    } catch (e) {
-      // 오류 처리
-      setState(() {
-        _messages[_messages.length - 1] = ChatMessage.assistant(
-          '죄송합니다. 오류가 발생했습니다: ${e.toString()}',
-        );
-        _isLoading = false;
-      });
-      _scrollToBottom();
     }
   }
 
@@ -451,90 +150,12 @@ class _AiChatPageState extends State<AiChatPage> {
     });
   }
 
-  /// Claude 응답에서 추천 데이터 파싱
-  ///
-  /// 응답 형식: 텍스트 + [RECOMMENDATIONS]JSON[/RECOMMENDATIONS]
-  /// 반환: (텍스트 부분, 추천 리스트)
-  (String, List<Recommendation>?) _parseResponse(String response) {
-    // [RECOMMENDATIONS]...[/RECOMMENDATIONS] 태그 찾기
-    final startTag = '[RECOMMENDATIONS]';
-    final endTag = '[/RECOMMENDATIONS]';
-
-    final startIndex = response.indexOf(startTag);
-    final endIndex = response.indexOf(endTag);
-
-    if (startIndex == -1 || endIndex == -1 || startIndex >= endIndex) {
-      // 추천 데이터가 없으면 원본 응답 그대로 반환
-      return (response, null);
-    }
-
-    // 텍스트 부분 추출 (추천 JSON 제외)
-    final textPart = response.substring(0, startIndex).trim();
-
-    // JSON 부분 추출
-    final jsonPart = response.substring(
-      startIndex + startTag.length,
-      endIndex,
-    ).trim();
-
-    try {
-      // JSON 파싱
-      final jsonData = jsonDecode(jsonPart) as Map<String, dynamic>;
-      final recommendationsJson = jsonData['recommendations'] as List<dynamic>;
-
-      // Recommendation 객체 리스트로 변환
-      final recommendations = recommendationsJson
-          .map((json) => Recommendation.fromJson(json as Map<String, dynamic>))
-          .toList();
-
-      return (textPart, recommendations);
-    } catch (e) {
-      print('❌ 추천 JSON 파싱 실패: $e');
-      print('JSON: $jsonPart');
-      // 파싱 실패 시 원본 응답 반환
-      return (response, null);
-    }
-  }
-
-  /// 채팅 프로필 업데이트
-  Future<void> _updateChatProfile(List<Recommendation>? recommendations) async {
-    try {
-      // 1. 대화 횟수 증가
-      await _chatProfileService.incrementChatCount();
-
-      // 2. 캐릭터 정보 저장
-      if (_selectedCharacter != null) {
-        await _chatProfileService.updateCharacter(_selectedCharacter!.id);
-      }
-
-      // 3. 추천이 있으면 저장
-      if (recommendations != null && recommendations.isNotEmpty) {
-        for (final rec in recommendations) {
-          await _chatProfileService.addRecommendation(
-            title: rec.title,
-            category: rec.category,
-            description: rec.description,
-          );
-
-          // 카테고리를 선호 카테고리로 추가
-          await _chatProfileService.addFavoriteCategory(rec.category);
-        }
-      }
-
-      print('✅ 채팅 프로필 업데이트 완료');
-    } catch (e) {
-      print('❌ 채팅 프로필 업데이트 실패: $e');
-      // 프로필 저장 실패는 사용자 경험에 영향을 주지 않도록 무시
-    }
-  }
-
   /// 카테고리 버튼 생성
   Widget _buildCategoryButton(String category, String emoji) {
     final isSelected = _selectedCategory == category;
     return GestureDetector(
       onTap: () {
         setState(() {
-          // 같은 카테고리를 누르면 토글 (닫기)
           _selectedCategory = isSelected ? null : category;
         });
       },
@@ -549,10 +170,7 @@ class _AiChatPageState extends State<AiChatPage> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              emoji,
-              style: const TextStyle(fontSize: 16),
-            ),
+            Text(emoji, style: const TextStyle(fontSize: 16)),
             const SizedBox(width: 4),
             Text(
               category,
@@ -572,10 +190,7 @@ class _AiChatPageState extends State<AiChatPage> {
   /// 예시 질문 버튼 생성
   Widget _buildExampleQuestion(String question) {
     return GestureDetector(
-      onTap: () {
-        // 예시 질문 클릭 시 자동으로 전송
-        _sendExampleQuestion(question);
-      },
+      onTap: () => _sendMessage(question),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
@@ -593,98 +208,19 @@ class _AiChatPageState extends State<AiChatPage> {
     );
   }
 
-  /// 예시 질문 전송 (SSE 스트리밍 방식)
-  Future<void> _sendExampleQuestion(String question) async {
-    if (_isLoading) return;
-
-    // 예시 질문을 사용자 메시지로 추가
-    final userMessage = ChatMessage.user(question);
-    setState(() {
-      _messages.add(userMessage);
-      _isLoading = true;
-      _selectedCategory = null; // 예시 질문 전송 후 카테고리 선택 해제
-    });
-
-    _scrollToBottom();
-
-    // 빈 Assistant 메시지를 먼저 추가 (스트리밍으로 채워질 예정)
-    final assistantMessage = ChatMessage.assistant('');
-    setState(() {
-      _messages.add(assistantMessage);
-    });
-
-    String accumulatedText = '';
-
-    try {
-      // 토큰 절약: 최근 10개 메시지만 전송 (5턴 대화)
-      final messagesToSend = _messages.where((msg) => msg != assistantMessage).toList();
-      final recentMessages = messagesToSend.length > 10
-          ? messagesToSend.sublist(messagesToSend.length - 10)
-          : messagesToSend;
-
-      print('💬 메시지 전송: ${messagesToSend.length}개 → ${recentMessages.length}개 (최근 10개로 제한)');
-
-      // Claude API 스트리밍 호출
-      final stream = _claudeService.sendMessageStream(
-        messages: recentMessages,
-        systemPrompt: _systemPrompt,
-        maxTokens: 2048,
-      );
-
-      await for (var chunk in stream) {
-        accumulatedText += chunk;
-
-        // 실시간으로 텍스트 업데이트
-        setState(() {
-          _messages[_messages.length - 1] = ChatMessage.assistant(accumulatedText);
-        });
-        _scrollToBottom();
-      }
-
-      // 스트리밍 완료 후 추천 데이터 파싱
-      final (textPart, recommendations) = _parseResponse(accumulatedText);
-
-      // 최종 메시지 업데이트 (추천 데이터 포함)
-      setState(() {
-        _messages[_messages.length - 1] = ChatMessage.assistant(
-          textPart,
-          recommendations: recommendations,
-        );
-        _isLoading = false;
-      });
-
-      // 채팅 프로필 업데이트
-      await _updateChatProfile(recommendations);
-
-      _scrollToBottom();
-    } catch (e) {
-      // 오류 처리
-      setState(() {
-        _messages[_messages.length - 1] = ChatMessage.assistant(
-          '죄송합니다. 오류가 발생했습니다: ${e.toString()}',
-        );
-        _isLoading = false;
-      });
-      _scrollToBottom();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final character = _characterManager.selectedCharacter;
+    final isLoadingData = _dataFetchManager.isLoadingData;
+    final isLoading = _messageHandler.isLoading;
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // 캐릭터 선택 페이지로 이동
-            context.go('/character-select');
-          },
+          onPressed: () => context.go('/character-select'),
         ),
-        title: Text(
-          _selectedCharacter != null
-              ? '${_selectedCharacter!.name}'
-              : 'AI 채팅',
-        ),
+        title: Text(character != null ? character.name : 'AI 채팅'),
       ),
       body: Column(
         children: [
@@ -693,19 +229,19 @@ class _AiChatPageState extends State<AiChatPage> {
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
+              itemCount: _messageHandler.messages.length,
               itemBuilder: (context, index) {
-                final message = _messages[index];
+                final message = _messageHandler.messages[index];
                 return MessageBubble(
                   message: message,
-                  character: _selectedCharacter,
+                  character: character,
                 );
               },
             ),
           ),
 
           // 로딩 인디케이터
-          if (_isLoadingData)
+          if (isLoadingData)
             const Padding(
               padding: EdgeInsets.all(8.0),
               child: Row(
@@ -721,7 +257,7 @@ class _AiChatPageState extends State<AiChatPage> {
                 ],
               ),
             ),
-          if (_isLoading)
+          if (isLoading)
             const Padding(
               padding: EdgeInsets.all(8.0),
               child: Row(
@@ -782,7 +318,7 @@ class _AiChatPageState extends State<AiChatPage> {
                     spacing: 8,
                     runSpacing: 8,
                     children: _exampleQuestions[_selectedCategory]!
-                        .map((question) => _buildExampleQuestion(question))
+                        .map(_buildExampleQuestion)
                         .toList(),
                   ),
                   const SizedBox(height: 8),
@@ -820,13 +356,23 @@ class _AiChatPageState extends State<AiChatPage> {
                       ),
                       maxLines: null,
                       textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
-                      enabled: !_isLoading,
+                      onSubmitted: (_) {
+                        final text = _messageController.text;
+                        _messageController.clear();
+                        _sendMessage(text);
+                      },
+                      enabled: !isLoading,
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    onPressed: _isLoading ? null : _sendMessage,
+                    onPressed: isLoading
+                        ? null
+                        : () {
+                            final text = _messageController.text;
+                            _messageController.clear();
+                            _sendMessage(text);
+                          },
                     icon: const Icon(Icons.send),
                     iconSize: 28,
                   ),

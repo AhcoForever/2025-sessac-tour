@@ -9,7 +9,7 @@
 [![Claude API](https://img.shields.io/badge/Claude-API-orange?logo=anthropic)](https://anthropic.com)
 [![Firebase](https://img.shields.io/badge/Firebase-Latest-yellow?logo=firebase)](https://firebase.google.com)
 
-[📱 Demo Video]() | [🎯 Seoul 365 Challenge](https://sihsc.welfare.seoul.kr/letsdoseoul/main.do)
+[📱 Demo Video](https://www.youtube.com/watch?v=q9CnQToewwg) | [🎯 Seoul 365 Challenge](https://sihsc.welfare.seoul.kr/letsdoseoul/main.do)
 </div>
 
 ---
@@ -251,7 +251,7 @@ class PromptBuilder {
     };
   }
 }
-```
+``` 
 
 ### 토큰 사용 최적화 전략
 

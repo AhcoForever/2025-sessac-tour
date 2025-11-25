@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geolocator/geolocator.dart';
-import 'dart:async';
 import 'package:custom_info_window/custom_info_window.dart';
-import '../services/location_service.dart';
-import '../services/marker_service.dart';
-import '../services/destination_service.dart';
-import '../services/kakao_directions_service.dart';
-import '../models/route_info.dart';
+import '../managers/location_tracker.dart';
+import '../managers/marker_manager.dart';
+import '../managers/route_manager.dart';
+import '../managers/destination_manager.dart';
+import '../managers/data_loader.dart';
 import '../constants/map_constants.dart';
 import 'widgets/marker_info_window.dart';
 import 'widgets/location_fab.dart';
@@ -16,8 +14,6 @@ import 'widgets/tourist_spot_bottom_sheet.dart';
 import 'widgets/distance_indicator_widget.dart';
 import 'widgets/arrival_dialog.dart';
 import 'widgets/night_spot_bottom_sheet.dart';
-import '../../public_data/services/visitseoul_api_service.dart';
-import '../../public_data/services/seoulapi_service.dart';
 import '../../public_data/models/content_info.dart';
 import '../../public_data/models/night_spot.dart';
 import '../../camera/screens/photo_capture_page.dart';
@@ -33,40 +29,16 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> {
-  // Services
-  final LocationService _locationService = LocationService();
-  final MarkerService _markerService = MarkerService();
-  final DestinationService _destinationService = DestinationService();
-  final KakaoDirectionsService _directionsService = KakaoDirectionsService();
-  final CustomInfoWindowController _customInfoWindowController =
-      CustomInfoWindowController();
-  final VisitSeoulApiService _visitSeoulApiService = VisitSeoulApiService();
-  final SeoulApiService _seoulApiService = SeoulApiService();
+  // Managers
+  final LocationTracker _locationTracker = LocationTracker();
+  final MarkerManager _markerManager = MarkerManager();
+  final RouteManager _routeManager = RouteManager();
+  final DestinationManager _destinationManager = DestinationManager();
+  final DataLoader _dataLoader = DataLoader();
 
   GoogleMapController? mapController;
-  Position? _currentPosition;
-  bool _isLoadingLocation = true;
-  final Set<Marker> _markers = {};
-  final Set<Polyline> _polylines = {}; // 경로 표시용
-  double _currentZoom = MapConstants.defaultZoom;
-  double _previousZoom = MapConstants.defaultZoom;
-  StreamSubscription<Position>? _positionStreamSubscription;
-  double _currentMarkerSize = MapConstants.defaultMarkerSize;
-  Offset? _markerScreenPosition;
-  List<ContentInfo> _touristSpots = [];
-  List<NightSpot> _nightSpots = [];
-
-  // 목적지 관련
-  ContentInfo? _selectedDestination;
-  double? _distanceToDestination;
-  bool _hasShownArrivalDialog = false;
-
-  // AI 추천 경로 관련
-  Recommendation? _aiDestination;
-  RouteInfo? _routeInfo;
-  bool _isLoadingRoute = false;
-  bool _mapReady = false; // 지도가 준비되었는지 여부
-  bool _hasTriedShowingRoute = false; // 경로 표시를 시도했는지 여부
+  bool _mapReady = false;
+  bool _hasTriedShowingRoute = false;
 
   @override
   void initState() {
@@ -82,137 +54,106 @@ class _MapPageState extends State<MapPage> {
       final showRoute = widget.routeParams!['showRoute'] as bool? ?? false;
 
       if (destination != null && showRoute) {
-        _aiDestination = destination;
+        _destinationManager.setAiDestination(destination);
       }
     }
   }
 
-  /// 지도 초기화 (순차적으로 실행)
+  /// 지도 초기화
   Future<void> _initializeMap() async {
-    // 1. 먼저 커스텀 마커 로드
-    await _loadCustomMarker();
-    // 2. 관광지 마커 아이콘 로드
-    _loadTouristSpotMarker();
-    // 3. 야경명소 마커 아이콘 로드
-    _loadNightSpotMarker();
-    // 4. 관광지 데이터 가져오기 (비동기로 실행하여 지도 로딩 차단 방지)
-    _loadTouristSpots();
-    // 5. 야경명소 데이터 가져오기
-    _loadNightSpots();
-    // 6. 마커 로드 완료 후 현재 위치 가져오기
+    // 1. 마커 아이콘 로드
+    await _markerManager.loadCustomMarker();
+    _markerManager.loadTouristSpotMarker();
+    _markerManager.loadNightSpotMarker();
+
+    // 2. 데이터 로드 (비동기)
+    _loadData();
+
+    // 3. 현재 위치 가져오기
     await _getCurrentLocation();
-    // 7. 실시간 위치 추적 시작
+
+    // 4. 실시간 위치 추적 시작
     _startLocationTracking();
-    // 8. AI 추천 경로는 onMapCreated에서 표시 (mapController가 준비된 후)
   }
 
-  /// 관광지 마커 아이콘 로드 (기본 빨간색 마커 사용)
-  void _loadTouristSpotMarker() {
-    _markerService.loadTouristSpotMarker();
-  }
-
-  /// 야경명소 마커 아이콘 로드 (파란색 마커 사용)
-  void _loadNightSpotMarker() {
-    _markerService.loadNightSpotMarker();
-  }
-
-  /// 관광지 데이터 가져오기
-  Future<void> _loadTouristSpots() async {
-    try {
-      print('🔵 관광지 데이터 로딩 시작');
-      final response = await _visitSeoulApiService.getContentList(
-        pageNo: 1,
-        langCodeId: 'ko',
-      );
-
-      if (response != null && response.data.isNotEmpty) {
-        print('✅ 관광지 ${response.data.length}개 로드 성공');
-
-        // 각 컨텐츠의 상세 정보 가져오기
-        final cidList = response.data
-            .take(MapConstants.touristSpotsLoadCount)
-            .map((item) => item.cid)
-            .toList();
-        final contents = await _visitSeoulApiService.getMultipleContents(cidList);
-
-        setState(() {
-          _touristSpots = contents;
-        });
-
-        // 관광지 마커 추가
+  /// 데이터 로드
+  Future<void> _loadData() async {
+    await _dataLoader.loadAllData();
+    if (mounted) {
+      setState(() {
         _addTouristSpotMarkers();
-      } else {
-        print('⚠️ 관광지 데이터가 없습니다.');
-      }
-    } catch (e) {
-      print('❌ 관광지 데이터 로드 실패: $e');
+        _addNightSpotMarkers();
+      });
     }
   }
 
-  /// 야경명소 데이터 가져오기
-  Future<void> _loadNightSpots() async {
-    try {
-      print('🌙 야경명소 데이터 로딩 시작');
-      final response = await _seoulApiService.getNightSpots(
-        startIndex: MapConstants.nightSpotsStartIndex,
-        endIndex: MapConstants.nightSpotsEndIndex,
-      );
+  /// 현재 위치 가져오기
+  Future<void> _getCurrentLocation() async {
+    final position = await _locationTracker.getCurrentLocation();
 
-      if (response != null && response.row.isNotEmpty) {
-        print('✅ 야경명소 ${response.row.length}개 로드 성공');
+    if (position == null) {
+      final errorMessage = await _locationTracker.getPermissionErrorMessage();
+      if (mounted && errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+      }
+    } else {
+      _markerManager.addUserLocationMarker(position);
+      _markerManager.updateMarkerScreenPosition(position);
+    }
+
+    if (mounted) setState(() {});
+    _tryShowAiRoute();
+  }
+
+  /// 실시간 위치 추적 시작
+  void _startLocationTracking() {
+    _locationTracker.startLocationTracking(
+      onPositionUpdate: (position) {
+        if (!mounted) return;
 
         setState(() {
-          _nightSpots = response.row;
+          _markerManager.addUserLocationMarker(position);
+          _markerManager.updateMarkerScreenPosition(position);
+
+          // 목적지가 설정되어 있으면 거리 계산 및 도착 확인
+          if (_destinationManager.selectedDestination != null) {
+            _destinationManager.calculateDistance(position);
+
+            if (_destinationManager.checkArrival(position)) {
+              _showArrivalDialog();
+            }
+          }
         });
 
-        // 야경명소 마커 추가
-        _addNightSpotMarkers();
-      } else {
-        print('⚠️ 야경명소 데이터가 없습니다.');
-      }
-    } catch (e) {
-      print('❌ 야경명소 데이터 로드 실패: $e');
-    }
+        // 지도를 새 위치로 이동
+        if (mapController != null) {
+          mapController!.animateCamera(
+            CameraUpdate.newLatLng(
+              LatLng(position.latitude, position.longitude),
+            ),
+          );
+        }
+      },
+    );
   }
 
   /// 관광지 마커 추가
   void _addTouristSpotMarkers() {
-    final newMarkers = _markerService.createTouristSpotMarkers(
-      spots: _touristSpots,
-      selectedDestinationId: _selectedDestination?.cid,
+    _markerManager.addTouristSpotMarkers(
+      spots: _dataLoader.touristSpots,
+      selectedDestinationId: _destinationManager.selectedDestination?.cid,
       onTap: _showTouristSpotDetails,
     );
-
-    setState(() {
-      // 기존 관광지 마커들 제거
-      _markers.removeWhere(
-        (m) => m.markerId.value.startsWith(MapConstants.touristSpotMarkerPrefix),
-      );
-      // 새 마커 추가
-      _markers.addAll(newMarkers);
-    });
   }
 
   /// 야경명소 마커 추가
   void _addNightSpotMarkers() {
-    final newMarkers = _markerService.createNightSpotMarkers(
-      spots: _nightSpots,
+    _markerManager.addNightSpotMarkers(
+      spots: _dataLoader.nightSpots,
       onTap: _showNightSpotDetails,
     );
-
-    setState(() {
-      // 기존 야경명소 마커들 제거
-      _markers.removeWhere(
-        (m) => m.markerId.value.startsWith(MapConstants.nightSpotMarkerPrefix),
-      );
-      // 새 마커 추가
-      _markers.addAll(newMarkers);
-    });
-  }
-
-  /// 야경명소 상세 정보 바텀 시트 표시
-  void _showNightSpotDetails(NightSpot spot) {
-    NightSpotBottomSheet.show(context, spot: spot);
   }
 
   /// 관광지 상세 정보 바텀 시트 표시
@@ -228,49 +169,38 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
+  /// 야경명소 상세 정보 바텀 시트 표시
+  void _showNightSpotDetails(NightSpot spot) {
+    NightSpotBottomSheet.show(context, spot: spot);
+  }
+
   /// 목적지 설정
   void _setDestination(ContentInfo destination) {
+    _destinationManager.setDestination(destination);
+
     setState(() {
-      _selectedDestination = destination;
-      _hasShownArrivalDialog = false;
-      _distanceToDestination = null;
+      _addTouristSpotMarkers(); // 선택된 목적지는 초록색으로
     });
 
-    // 관광지 마커 재생성 (선택된 목적지는 초록색으로)
-    _addTouristSpotMarkers();
-
-    // 목적지까지의 거리 계산
-    if (_currentPosition != null) {
-      _calculateDistance();
-
-      // 경로 표시
+    final currentPosition = _locationTracker.currentPosition;
+    if (currentPosition != null) {
+      _destinationManager.calculateDistance(currentPosition);
       _showRouteToDestination(destination);
     }
   }
 
-  /// 선택된 목적지까지의 경로 표시
+  /// 목적지까지의 경로 표시
   Future<void> _showRouteToDestination(ContentInfo destination) async {
-    if (_currentPosition == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('현재 위치를 가져오는 중입니다...'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 2),
-        ),
-      );
+    final currentPosition = _locationTracker.currentPosition;
+
+    if (currentPosition == null) {
+      _showSnackBar('현재 위치를 가져오는 중입니다...', Colors.orange);
       return;
     }
 
-    // 좌표 확인
     if (destination.traffic?.mapPositionY == null ||
         destination.traffic?.mapPositionX == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('목적지의 위치 정보가 없습니다.'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      _showSnackBar('목적지의 위치 정보가 없습니다.', Colors.red);
       return;
     }
 
@@ -278,309 +208,113 @@ class _MapPageState extends State<MapPage> {
       final destLat = double.parse(destination.traffic!.mapPositionY!);
       final destLng = double.parse(destination.traffic!.mapPositionX!);
 
-      final start = LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
+      final start = LatLng(currentPosition.latitude, currentPosition.longitude);
       final goal = LatLng(destLat, destLng);
 
-      // Kakao Directions API로 경로 조회
-      final routeInfo = await _directionsService.getRoute(
+      final routeInfo = await _routeManager.showRoute(
         start: start,
         goal: goal,
-        priority: 'RECOMMEND',
+        routeId: 'marker_route',
       );
 
       if (routeInfo != null && mounted) {
-        setState(() {
-          _routeInfo = routeInfo;
-        });
-
-        // 경로 Polyline 그리기 (마커 경로 ID 사용)
-        _drawRoute(routeInfo.path, routeId: 'marker_route');
-
-        // 카메라를 경로가 보이도록 조정
-        _fitRouteBounds(routeInfo.path);
-
-        // 사용자에게 경로 정보 알림
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.navigation, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${destination.postSj}\n${routeInfo.distanceInKm}, ${routeInfo.durationInMinutes}',
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.green[700],
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
-      } else {
-        // 경로 조회 실패 시
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${destination.postSj}까지의 경로를 찾을 수 없습니다.'),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
+        setState(() {});
+        _showSnackBar(
+          '${destination.postSj}\n${routeInfo.distanceInKm}, ${routeInfo.durationInMinutes}',
+          Colors.green[700]!,
+          icon: Icons.navigation,
+        );
+      } else if (mounted) {
+        _showSnackBar('${destination.postSj}까지의 경로를 찾을 수 없습니다.', Colors.orange);
       }
     } catch (e) {
       debugPrint('❌ 경로 표시 에러: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('경로를 표시하는 중 오류가 발생했습니다.'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        _showSnackBar('경로를 표시하는 중 오류가 발생했습니다.', Colors.red);
       }
-    }
-  }
-
-  /// 목적지까지의 거리 계산
-  void _calculateDistance() {
-    if (_selectedDestination == null || _currentPosition == null) return;
-
-    final distance = _destinationService.calculateDistanceToDestination(
-      currentPosition: _currentPosition!,
-      destination: _selectedDestination!,
-    );
-
-    if (distance == null) return;
-
-    setState(() {
-      _distanceToDestination = distance;
-    });
-
-    // 도착 확인
-    if (_destinationService.hasArrived(distance) && !_hasShownArrivalDialog) {
-      _showArrivalDialog();
     }
   }
 
   /// 도착 알림 다이얼로그
   void _showArrivalDialog() {
-    setState(() {
-      _hasShownArrivalDialog = true;
-    });
+    _destinationManager.markArrivalDialogShown();
+
+    final destInfo = _destinationManager.getDestinationInfo();
+    if (destInfo == null) return;
 
     ArrivalDialog.show(
       context,
-      destinationName: _selectedDestination!.postSj,
-      onTakePhoto: _navigateToPhotoCapture,
+      destinationName: destInfo['name'],
+      onTakePhoto: () => _navigateToPhotoCapture(destInfo),
     );
   }
 
   /// 카메라 페이지로 이동
-  void _navigateToPhotoCapture() {
-    if (_selectedDestination == null) return;
-
-    // 주소 정보 가져오기
-    final address = _selectedDestination!.traffic?.newAdres ??
-        _selectedDestination!.traffic?.adres ??
-        '주소 정보 없음';
-
-    // 좌표 정보 가져오기
-    final lat = _selectedDestination!.traffic?.mapPositionY != null
-        ? double.tryParse(_selectedDestination!.traffic!.mapPositionY!) ?? 0.0
-        : 0.0;
-    final lng = _selectedDestination!.traffic?.mapPositionX != null
-        ? double.tryParse(_selectedDestination!.traffic!.mapPositionX!) ?? 0.0
-        : 0.0;
-
+  void _navigateToPhotoCapture(Map<String, dynamic> destInfo) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => PhotoCapturePage(
-          destinationName: _selectedDestination!.postSj,
-          destinationAddress: address,
-          latitude: lat,
-          longitude: lng,
-          destinationId: _selectedDestination!.cid,
+          destinationName: destInfo['name'],
+          destinationAddress: destInfo['address'],
+          latitude: destInfo['latitude'],
+          longitude: destInfo['longitude'],
+          destinationId: destInfo['id'],
         ),
       ),
     );
   }
 
-  /// 실시간 위치 추적 시작
-  void _startLocationTracking() {
-    const LocationSettings locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: MapConstants.locationUpdateDistance,
-    );
-
-    _positionStreamSubscription = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((Position position) {
-      setState(() {
-        _currentPosition = position;
-      });
-      // 마커 위치 업데이트
-      _addUserLocationMarker(position);
-
-      // 마커 화면 좌표 업데이트
-      _updateMarkerScreenPosition();
-
-      // 목적지가 설정되어 있으면 거리 계산
-      if (_selectedDestination != null) {
-        _calculateDistance();
-      }
-
-      // 지도를 새 위치로 부드럽게 이동
-      if (mapController != null) {
-        mapController!.animateCamera(
-          CameraUpdate.newLatLng(
-            LatLng(position.latitude, position.longitude),
-          ),
-        );
-      }
-    });
-  }
-
-  /// 커스텀 마커 아이콘 로드
-  Future<void> _loadCustomMarker({double? zoomLevel}) async {
-    final zoom = zoomLevel ?? _currentZoom;
-
-    setState(() {
-      _currentMarkerSize = _markerService.getMarkerSize(zoom);
-    });
-
-    await _markerService.loadCustomMarker(zoomLevel: zoom);
-
-    // 마커가 업데이트되었으면 현재 위치 마커도 업데이트
-    if (_currentPosition != null) {
-      _addUserLocationMarker(_currentPosition!);
-    }
-  }
-
+  /// 지도 생성 콜백
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
-    _customInfoWindowController.googleMapController = controller;
-    _updateMarkerScreenPosition();
+    _markerManager.setMapController(controller);
+    _routeManager.setMapController(controller);
+
+    final currentPosition = _locationTracker.currentPosition;
+    if (currentPosition != null) {
+      _markerManager.updateMarkerScreenPosition(currentPosition);
+    }
 
     _mapReady = true;
     _tryShowAiRoute();
   }
 
-  /// 마커의 화면 좌표 업데이트
-  Future<void> _updateMarkerScreenPosition() async {
-    if (mapController == null || _currentPosition == null) return;
-
-    final latLng = LatLng(
-      _currentPosition!.latitude,
-      _currentPosition!.longitude,
-    );
-
-    try {
-      final screenCoordinate = await mapController!.getScreenCoordinate(latLng);
-      setState(() {
-        _markerScreenPosition = Offset(
-          screenCoordinate.x.toDouble(),
-          screenCoordinate.y.toDouble(),
-        );
-      });
-    } catch (e) {
-      // 에러 무시 (맵이 아직 준비되지 않은 경우)
-    }
-  }
-
-  /// 카메라 이동 시 줌 레벨 변화 감지
+  /// 카메라 이동 시 처리
   void _onCameraMove(CameraPosition position) {
-    _currentZoom = position.zoom;
+    _markerManager.customInfoWindowController.onCameraMove!();
 
-    // 마커 화면 좌표 업데이트
-    _updateMarkerScreenPosition();
-
-    // 줌 레벨이 임계값 이상 변경되었을 때만 마커 크기 업데이트
-    if ((_currentZoom - _previousZoom).abs() >= MapConstants.zoomChangeThreshold) {
-      _previousZoom = _currentZoom;
-      _loadCustomMarker(zoomLevel: _currentZoom);
+    final currentPosition = _locationTracker.currentPosition;
+    if (currentPosition != null) {
+      _markerManager.updateMarkerScreenPosition(currentPosition);
     }
+
+    // 줌 레벨 변화 처리
+    _markerManager.handleCameraMove(position, (newSize) {
+      if (mounted) {
+        setState(() {});
+        final pos = _locationTracker.currentPosition;
+        if (pos != null) {
+          _markerManager.addUserLocationMarker(pos);
+        }
+      }
+    });
   }
 
-  /// 현재 위치 가져오기
-  Future<void> _getCurrentLocation() async {
-    setState(() {
-      _isLoadingLocation = true;
-    });
-
-    // LocationService를 통해 위치 가져오기
-    final position = await _locationService.getCurrentLocation();
+  /// 현재 위치로 카메라 이동
+  Future<void> _moveToCurrentLocation() async {
+    var position = _locationTracker.currentPosition;
 
     if (position == null) {
-      // 권한 에러 메시지 표시
-      final errorMessage = await _locationService.getPermissionErrorMessage();
-      if (mounted && errorMessage != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage)));
-      }
-    } else {
-      // 현재 위치에 마커 추가
-      _addUserLocationMarker(position);
-      // 마커 화면 좌표 업데이트
-      _updateMarkerScreenPosition();
+      position = await _locationTracker.getCurrentLocation();
+      if (mounted) setState(() {});
     }
 
-    setState(() {
-      _currentPosition = position;
-      _isLoadingLocation = false;
-    });
-
-    // 위치가 준비되었으면 AI 경로 표시 시도
-    _tryShowAiRoute();
-  }
-
-  /// 사용자 위치에 마커 추가
-  void _addUserLocationMarker(Position position) {
-    final markerPosition = LatLng(position.latitude, position.longitude);
-
-    final marker = _markerService.createUserLocationMarker(
-      latitude: position.latitude,
-      longitude: position.longitude,
-      onTap: () {
-        _customInfoWindowController.addInfoWindow!(
-          const MarkerInfoWindow(message: MapConstants.markerTapMessage),
-          markerPosition,
-        );
-      },
-    );
-
-    if (marker == null) return;
-
-    setState(() {
-      // 기존 마커 제거 후 새로 추가
-      _markers.removeWhere(
-        (m) => m.markerId == const MarkerId(MapConstants.userLocationMarkerId),
-      );
-      _markers.add(marker);
-    });
-  }
-
-  /// 카메라를 사용자 위치로 이동
-  Future<void> _moveToCurrentLocation() async {
-    if (_currentPosition == null) {
-      await _getCurrentLocation();
-    }
-
-    if (_currentPosition != null && mapController != null) {
-      final position = LatLng(
-        _currentPosition!.latitude,
-        _currentPosition!.longitude,
-      );
-
+    if (position != null && mapController != null) {
       await mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(
-            target: position,
+            target: LatLng(position.latitude, position.longitude),
             zoom: MapConstants.currentLocationZoom,
             tilt: MapConstants.defaultTilt,
           ),
@@ -589,17 +323,117 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
+  /// AI 추천 경로 표시
+  Future<void> _showAiRecommendedRoute() async {
+    final aiDestination = _destinationManager.aiDestination;
+    final currentPosition = _locationTracker.currentPosition;
+
+    if (aiDestination == null ||
+        aiDestination.latitude == null ||
+        aiDestination.longitude == null ||
+        currentPosition == null) {
+      debugPrint('❌ 경로 표시 불가: 목적지 또는 현재 위치 정보 없음');
+      return;
+    }
+
+    final start = LatLng(currentPosition.latitude, currentPosition.longitude);
+    final goal = LatLng(aiDestination.latitude!, aiDestination.longitude!);
+
+    final routeInfo = await _routeManager.showRoute(
+      start: start,
+      goal: goal,
+      routeId: 'ai_route',
+    );
+
+    if (routeInfo != null && mounted) {
+      setState(() {
+        _markerManager.addAiDestinationMarker(
+          position: goal,
+          title: aiDestination.title,
+          snippet: aiDestination.address ?? '목적지',
+        );
+      });
+
+      _showSnackBar(
+        '경로 안내: ${routeInfo.distanceInKm}, ${routeInfo.durationInMinutes}',
+        Colors.blue[700]!,
+      );
+    } else {
+      debugPrint('❌ 경로 조회 실패');
+      if (mounted) {
+        _showSnackBar('경로를 찾을 수 없습니다. 로그를 확인해주세요.', Colors.red);
+      }
+    }
+  }
+
+  /// AI 경로 표시 시도
+  void _tryShowAiRoute() {
+    if (_destinationManager.aiDestination != null &&
+        _locationTracker.currentPosition != null &&
+        _mapReady &&
+        !_hasTriedShowingRoute) {
+      _hasTriedShowingRoute = true;
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _showAiRecommendedRoute();
+      });
+    }
+  }
+
+  /// AI 경로 초기화
+  void _clearAiRoute() {
+    setState(() {
+      _destinationManager.clearAiDestination();
+      _routeManager.removeRoute('ai_route');
+      _markerManager.removeMarker('ai_destination');
+      _hasTriedShowingRoute = false;
+    });
+
+    if (_locationTracker.currentPosition != null) {
+      _moveToCurrentLocation();
+    }
+  }
+
+  /// SnackBar 표시 헬퍼
+  void _showSnackBar(String message, Color backgroundColor, {IconData? icon}) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: icon != null
+            ? Row(
+                children: [
+                  Icon(icon, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(message)),
+                ],
+              )
+            : Text(message),
+        backgroundColor: backgroundColor,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 위치 정보를 가져오는 동안 로딩 표시
-    if (_isLoadingLocation && _currentPosition == null) {
+    final currentPosition = _locationTracker.currentPosition;
+    final isLoading = _locationTracker.isLoadingLocation;
+
+    // 로딩 중
+    if (isLoading && currentPosition == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // 위치 정보가 있으면 해당 위치로, 없으면 서울 중심으로
-    final initialPosition = _currentPosition != null
-        ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+    final initialPosition = currentPosition != null
+        ? LatLng(currentPosition.latitude, currentPosition.longitude)
         : MapConstants.seoulCenter;
+
+    final aiDestination = _destinationManager.aiDestination;
+    final routeInfo = _routeManager.routeInfo;
+    final selectedDestination = _destinationManager.selectedDestination;
+    final distanceToDestination = _destinationManager.distanceToDestination;
+    final markerScreenPosition = _markerManager.markerScreenPosition;
+    final currentMarkerSize = _markerManager.currentMarkerSize;
 
     return Scaffold(
       body: Stack(
@@ -612,60 +446,57 @@ class _MapPageState extends State<MapPage> {
               tilt: MapConstants.defaultTilt,
               bearing: MapConstants.defaultBearing,
             ),
-            markers: _markers,
-            polylines: _polylines, // AI 추천 경로 표시
+            markers: _markerManager.markers,
+            polylines: _routeManager.polylines,
             buildingsEnabled: true,
             mapType: MapType.normal,
             myLocationEnabled: false,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             compassEnabled: false,
-            onTap: (position) {
-              _customInfoWindowController.hideInfoWindow!();
+            onTap: (_) {
+              _markerManager.customInfoWindowController.hideInfoWindow!();
             },
-            onCameraMove: (position) {
-              _customInfoWindowController.onCameraMove!();
-              _onCameraMove(position);
-            },
+            onCameraMove: _onCameraMove,
           ),
-          // 애니메이션 마커 (GPS 위치에 고정)
-          if (_currentPosition != null && _markerScreenPosition != null)
+
+          // 애니메이션 마커
+          if (currentPosition != null && markerScreenPosition != null)
             Positioned(
-              left: _markerScreenPosition!.dx - (_currentMarkerSize / 2),
-              top: _markerScreenPosition!.dy - (_currentMarkerSize / 2),
+              left: markerScreenPosition.dx - (currentMarkerSize / 2),
+              top: markerScreenPosition.dy - (currentMarkerSize / 2),
               child: FloatingMarker(
                 imagePath: MapConstants.dangdangImagePath,
-                size: _currentMarkerSize,
+                size: currentMarkerSize,
                 onTap: () {
-                  if (_currentPosition != null) {
-                    final markerPosition = LatLng(
-                      _currentPosition!.latitude,
-                      _currentPosition!.longitude,
-                    );
-                    _customInfoWindowController.addInfoWindow!(
-                      const MarkerInfoWindow(message: MapConstants.markerTapMessage),
-                      markerPosition,
-                    );
-                  }
+                  final markerPos = LatLng(
+                    currentPosition.latitude,
+                    currentPosition.longitude,
+                  );
+                  _markerManager.customInfoWindowController.addInfoWindow!(
+                    const MarkerInfoWindow(message: MapConstants.markerTapMessage),
+                    markerPos,
+                  );
                 },
               ),
             ),
+
           CustomInfoWindow(
-            controller: _customInfoWindowController,
+            controller: _markerManager.customInfoWindowController,
             height: MapConstants.customInfoWindowHeight,
             width: MapConstants.customInfoWindowWidth,
             offset: MapConstants.customInfoWindowOffset,
           ),
 
           // 목적지까지 거리 표시
-          if (_selectedDestination != null && _distanceToDestination != null)
+          if (selectedDestination != null && distanceToDestination != null)
             DistanceIndicatorWidget(
-              destinationName: _selectedDestination!.postSj,
-              distance: _distanceToDestination!,
+              destinationName: selectedDestination.postSj,
+              distance: distanceToDestination,
             ),
 
           // AI 추천 경로 안내
-          if (_routeInfo != null && _aiDestination != null)
+          if (routeInfo != null && aiDestination != null)
             Positioned(
               top: 60,
               left: 16,
@@ -683,14 +514,12 @@ class _MapPageState extends State<MapPage> {
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            Icons.navigation,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                          Icon(Icons.navigation,
+                              color: Theme.of(context).colorScheme.primary),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              _aiDestination!.title,
+                              aiDestination.title,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -708,18 +537,12 @@ class _MapPageState extends State<MapPage> {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Icon(
-                            Icons.directions_walk,
-                            size: 20,
-                            color: Colors.grey[600],
-                          ),
+                          Icon(Icons.directions_walk,
+                              size: 20, color: Colors.grey[600]),
                           const SizedBox(width: 4),
                           Text(
-                            '${_routeInfo!.distanceInKm} · ${_routeInfo!.durationInMinutes}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
+                            '${routeInfo.distanceInKm} · ${routeInfo.durationInMinutes}',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                           ),
                         ],
                       ),
@@ -732,187 +555,15 @@ class _MapPageState extends State<MapPage> {
       ),
       floatingActionButton: LocationFab(
         onPressed: _moveToCurrentLocation,
-        isLoading: _isLoadingLocation,
+        isLoading: isLoading,
       ),
     );
-  }
-
-  // ==================== AI 추천 경로 관련 메서드 ====================
-
-  /// AI 추천 경로 표시
-  Future<void> _showAiRecommendedRoute() async {
-    if (_aiDestination == null ||
-        _aiDestination!.latitude == null ||
-        _aiDestination!.longitude == null ||
-        _currentPosition == null) {
-      debugPrint('❌ 경로 표시 불가: 목적지 또는 현재 위치 정보 없음');
-      return;
-    }
-
-    setState(() => _isLoadingRoute = true);
-
-    try {
-      final start = LatLng(
-        _currentPosition!.latitude,
-        _currentPosition!.longitude,
-      );
-      final goal = LatLng(
-        _aiDestination!.latitude!,
-        _aiDestination!.longitude!,
-      );
-
-      // Kakao Directions API로 경로 조회
-      final routeInfo = await _directionsService.getRoute(
-        start: start,
-        goal: goal,
-        priority: 'RECOMMEND', // 추천 경로
-      );
-
-      if (routeInfo != null && mounted) {
-        setState(() {
-          _routeInfo = routeInfo;
-          _isLoadingRoute = false;
-        });
-
-        // 경로 Polyline 그리기
-        _drawRoute(routeInfo.path);
-
-        // 목적지 마커 추가
-        _addAiDestinationMarker(goal);
-
-        // 카메라를 경로가 보이도록 조정
-        _fitRouteBounds(routeInfo.path);
-
-        // 사용자에게 성공 알림
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('경로 안내: ${routeInfo.distanceInKm}, ${routeInfo.durationInMinutes}'),
-              backgroundColor: Colors.blue[700],
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-      } else {
-        debugPrint('❌ 경로 조회 실패');
-        setState(() => _isLoadingRoute = false);
-
-        // 사용자에게 실패 알림
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('경로를 찾을 수 없습니다. 로그를 확인해주세요.'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 5),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('❌ 경로 표시 에러: $e');
-      setState(() => _isLoadingRoute = false);
-    }
-  }
-
-  /// 경로를 Polyline으로 그리기
-  void _drawRoute(List<LatLng> path, {String routeId = 'ai_route'}) {
-    final polyline = Polyline(
-      polylineId: PolylineId(routeId),
-      points: path,
-      color: Colors.blue,
-      width: 5,
-      startCap: Cap.roundCap,
-      endCap: Cap.roundCap,
-      geodesic: true,
-    );
-
-    setState(() {
-      // 같은 ID의 경로만 제거 (다른 경로는 유지)
-      _polylines.removeWhere((p) => p.polylineId.value == routeId);
-      _polylines.add(polyline);
-    });
-  }
-
-  /// AI 목적지 마커 추가
-  void _addAiDestinationMarker(LatLng position) {
-    final marker = Marker(
-      markerId: const MarkerId('ai_destination'),
-      position: position,
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-      infoWindow: InfoWindow(
-        title: _aiDestination!.title,
-        snippet: _aiDestination!.address ?? '목적지',
-      ),
-    );
-
-    setState(() {
-      // 기존 AI 목적지 마커 제거 후 추가
-      _markers.removeWhere((m) => m.markerId.value == 'ai_destination');
-      _markers.add(marker);
-    });
-  }
-
-  /// 경로가 모두 보이도록 카메라 조정
-  void _fitRouteBounds(List<LatLng> path) {
-    if (path.isEmpty || mapController == null) return;
-
-    double minLat = path.first.latitude;
-    double maxLat = path.first.latitude;
-    double minLng = path.first.longitude;
-    double maxLng = path.first.longitude;
-
-    for (final point in path) {
-      if (point.latitude < minLat) minLat = point.latitude;
-      if (point.latitude > maxLat) maxLat = point.latitude;
-      if (point.longitude < minLng) minLng = point.longitude;
-      if (point.longitude > maxLng) maxLng = point.longitude;
-    }
-
-    final bounds = LatLngBounds(
-      southwest: LatLng(minLat, minLng),
-      northeast: LatLng(maxLat, maxLng),
-    );
-
-    mapController!.animateCamera(
-      CameraUpdate.newLatLngBounds(bounds, 100), // 100픽셀 패딩
-    );
-  }
-
-  /// AI 경로 표시 시도 (지도와 위치가 모두 준비되었을 때)
-  void _tryShowAiRoute() {
-    if (_aiDestination != null &&
-        _currentPosition != null &&
-        _mapReady &&
-        !_hasTriedShowingRoute) {
-      _hasTriedShowingRoute = true;
-      // 약간의 딜레이를 주어 지도가 완전히 준비되도록 함
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _showAiRecommendedRoute();
-      });
-    }
-  }
-
-  /// AI 경로 초기화
-  void _clearAiRoute() {
-    setState(() {
-      _routeInfo = null;
-      _aiDestination = null;
-      // AI 경로만 제거 (마커 경로는 유지)
-      _polylines.removeWhere((p) => p.polylineId.value == 'ai_route');
-      _markers.removeWhere((m) => m.markerId.value == 'ai_destination');
-      _hasTriedShowingRoute = false;
-    });
-
-    // 현재 위치로 카메라 이동
-    if (_currentPosition != null) {
-      _moveToCurrentLocation();
-    }
   }
 
   @override
   void dispose() {
-    _positionStreamSubscription?.cancel();
-    _customInfoWindowController.dispose();
+    _locationTracker.dispose();
+    _markerManager.dispose();
     mapController?.dispose();
     super.dispose();
   }
